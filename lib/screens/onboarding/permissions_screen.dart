@@ -20,6 +20,7 @@ class PermissionsScreen extends StatefulWidget {
 class _PermissionsScreenState extends State<PermissionsScreen> {
   bool _calendarEnabled = false;
   bool _emailEnabled = false;
+  bool _linkedinEnabled = false;
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +50,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             ),
             
             Expanded(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Column(
                   children: [
@@ -71,7 +72,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'To unlock the full experience, integrate your calendar and email.',
+                    'To unlock the full experience, integrate your calendar, email, and LinkedIn.',
                     style: GoogleFonts.dmSans(
                       fontSize: 18,
                       fontWeight: FontWeight.normal,
@@ -110,7 +111,20 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 },
               ),
               
-              const Spacer(flex: 2),
+              const SizedBox(height: 16),
+              
+              PermissionToggle(
+                title: 'LinkedIn Integration',
+                subtitle: 'Track career progress and opportunities.',
+                value: _linkedinEnabled,
+                onChanged: (value) {
+                  setState(() {
+                    _linkedinEnabled = value;
+                  });
+                },
+              ),
+              
+              const SizedBox(height: 40),
               
               // Finish Setup Button
               OnboardingButton(
@@ -118,7 +132,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                 onPressed: widget.onFinishSetup,
               ),
               
-              const SizedBox(height: 24),
+              const SizedBox(height: 40),
                   ],
                 ),
               ),

@@ -84,15 +84,22 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                     ),
                   ),
                 ),
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.date,
-                  initialDateTime: _selectedDate,
-                  minimumDate: DateTime.now().subtract(const Duration(days: 1)),
-                  onDateTimeChanged: (date) {
-                    setState(() {
-                      _selectedDate = date;
-                    });
-                  },
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: Theme.of(context).colorScheme.copyWith(
+                      primary: Colors.grey[600],
+                    ),
+                  ),
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.date,
+                    initialDateTime: _selectedDate,
+                    minimumDate: DateTime.now().subtract(const Duration(days: 1)),
+                    onDateTimeChanged: (date) {
+                      setState(() {
+                        _selectedDate = date;
+                      });
+                    },
+                  ),
                 ),
               ),
             ),
@@ -280,7 +287,7 @@ class _EditTaskScreenState extends State<EditTaskScreen> {
                     children: [
                       _buildPriorityChip('high', 'High', Colors.red),
                       const SizedBox(width: 8),
-                      _buildPriorityChip('medium', 'Medium', Colors.orange),
+                      _buildPriorityChip('medium', 'Medium', Colors.grey[600]!),
                       const SizedBox(width: 8),
                       _buildPriorityChip('low', 'Low', Colors.green),
                     ],

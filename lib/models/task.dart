@@ -8,6 +8,7 @@ class Task {
   final bool isCompleted;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final String tag; // 'work', 'personal'
 
   Task({
     required this.id,
@@ -19,6 +20,7 @@ class Task {
     this.isCompleted = false,
     required this.createdAt,
     this.updatedAt,
+    this.tag = 'work',
   });
 
   Task copyWith({
@@ -31,6 +33,7 @@ class Task {
     bool? isCompleted,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? tag,
   }) {
     return Task(
       id: id ?? this.id,
@@ -42,6 +45,7 @@ class Task {
       isCompleted: isCompleted ?? this.isCompleted,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      tag: tag ?? this.tag,
     );
   }
 
@@ -56,6 +60,7 @@ class Task {
       'isCompleted': isCompleted,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'tag': tag,
     };
   }
 
@@ -70,6 +75,7 @@ class Task {
       isCompleted: map['isCompleted'] ?? false,
       createdAt: DateTime.parse(map['createdAt']),
       updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
+      tag: map['tag'] ?? 'work',
     );
   }
 }

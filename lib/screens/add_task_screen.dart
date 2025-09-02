@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
 import '../models/task.dart';
 
 class AddTaskScreen extends StatefulWidget {
@@ -19,18 +20,35 @@ class AddTaskScreen extends StatefulWidget {
   State<AddTaskScreen> createState() => _AddTaskScreenState();
 }
 
-class _AddTaskScreenState extends State<AddTaskScreen> {
+class _AddTaskScreenState extends State<AddTaskScreen> with TickerProviderStateMixin {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   String _selectedPriority = 'medium';
   String _selectedTimeOfDay = 'morning';
   DateTime _selectedDate = DateTime.now();
   bool _isEditMode = false;
+  bool _isRecording = false;
+  List<String> _attachments = [];
+  List<String> _voiceNotes = [];
+  late AnimationController _recordingAnimationController;
+  late AnimationController _pulseAnimationController;
+  int _recordingSeconds = 0;
+  Timer? _recordingTimer;
+  String _selectedTag = 'work';
 
   @override
   void initState() {
     super.initState();
     _isEditMode = widget.isEditMode;
+    _selectedTag = widget.task?.tag ?? 'work';
+    _recordingAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _pulseAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
     
     if (widget.task != null) {
       _titleController.text = widget.task!.title;
@@ -45,6 +63,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   void dispose() {
     _titleController.dispose();
     _notesController.dispose();
+    _recordingAnimationController.dispose();
+    _pulseAnimationController.dispose();
+    _recordingTimer?.cancel();
     super.dispose();
   }
 
@@ -66,8 +87,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     child: Text(
                       'Cancel',
                       style: GoogleFonts.dmSans(
-                        color: Colors.black,
+                        color: Colors.grey[600],
                         fontSize: 16,
+                        letterSpacing: -0.2,
                       ),
                     ),
                     onPressed: () => Navigator.pop(context),
@@ -76,9 +98,10 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     child: Text(
                       'Done',
                       style: GoogleFonts.dmSans(
-                        color: Colors.black,
+                        color: Colors.grey[600],
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
                       ),
                     ),
                     onPressed: () => Navigator.pop(context),
@@ -87,17 +110,26 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               ),
             ),
             Expanded(
-              child: CupertinoTheme(
-                data: const CupertinoThemeData(
-                  textTheme: CupertinoTextThemeData(
-                    dateTimePickerTextStyle: TextStyle(
-                      color: Colors.black,
-                      fontSize: 22,
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  cupertinoOverrideTheme: CupertinoThemeData(
+                    textTheme: CupertinoTextThemeData(
+                      dateTimePickerTextStyle: GoogleFonts.dmSans(
+                        color: Colors.grey[700],
+                        fontSize: 22,
+                        letterSpacing: -0.3,
+                      ),
                     ),
                   ),
                 ),
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.date,
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: Theme.of(context).colorScheme.copyWith(
+                      primary: Colors.grey[600],
+                    ),
+                  ),
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.date,
                   initialDateTime: _selectedDate,
                   minimumDate: DateTime.now().subtract(const Duration(days: 1)),
                   onDateTimeChanged: (date) {
@@ -105,6 +137,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       _selectedDate = date;
                     });
                   },
+                ),
                 ),
               ),
             ),
@@ -129,9 +162,222 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
       isCompleted: widget.task?.isCompleted ?? false,
       createdAt: widget.task?.createdAt ?? DateTime.now(),
       updatedAt: DateTime.now(),
+      tag: _selectedTag,
     );
 
     Navigator.pop(context, task);
+  }
+
+  void _toggleVoiceRecording() {
+    setState(() {
+      _isRecording = !_isRecording;
+    });
+    
+    if (_isRecording) {
+      _recordingAnimationController.forward();
+      _pulseAnimationController.repeat();
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        setState(() {
+          _recordingSeconds++;
+        });
+      });
+    } else {
+      _recordingAnimationController.reverse();
+      _pulseAnimationController.stop();
+      _recordingTimer?.cancel();
+      setState(() {
+        _voiceNotes.add('Voice note ${_voiceNotes.length + 1}');
+        _recordingSeconds = 0;
+      });
+    }
+  }
+  
+  void _showAttachmentOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Add Attachment',
+              style: GoogleFonts.dmSans(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildAttachmentOption(
+              icon: Icons.photo_library,
+              title: 'Photo Library',
+              onTap: () {
+                Navigator.pop(context);
+                _addAttachment('Photo from library');
+              },
+            ),
+            _buildAttachmentOption(
+              icon: Icons.camera_alt,
+              title: 'Camera',
+              onTap: () {
+                Navigator.pop(context);
+                _addAttachment('Photo from camera');
+              },
+            ),
+            _buildAttachmentOption(
+              icon: Icons.insert_drive_file,
+              title: 'Document',
+              onTap: () {
+                Navigator.pop(context);
+                _addAttachment('Document file');
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildAttachmentOption({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.grey[600]),
+            const SizedBox(width: 16),
+            Text(
+              title,
+              style: GoogleFonts.dmSans(
+                fontSize: 16,
+                color: Colors.grey[700],
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  void _addAttachment(String attachment) {
+    setState(() {
+      _attachments.add(attachment);
+    });
+  }
+  
+  List<Widget> _buildAttachmentsList() {
+    List<Widget> widgets = [];
+    
+    // Voice notes
+    for (int i = 0; i < _voiceNotes.length; i++) {
+      widgets.add(
+        Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.mic, size: 16, color: Colors.blue[600]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _voiceNotes[i],
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    color: Colors.blue[600],
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              if (!widget.isViewMode || _isEditMode)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _voiceNotes.removeAt(i);
+                    });
+                  },
+                  child: Icon(
+                    Icons.close,
+                    size: 16,
+                    color: Colors.grey[500],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // File attachments
+    for (int i = 0; i < _attachments.length; i++) {
+      widgets.add(
+        Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.attach_file, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _attachments[i],
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              if (!widget.isViewMode || _isEditMode)
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _attachments.removeAt(i);
+                    });
+                  },
+                  child: Icon(
+                    Icons.close,
+                    size: 16,
+                    color: Colors.grey[500],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    return widgets;
   }
 
   void _deleteTask() {
@@ -144,6 +390,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: Colors.black,
+            letterSpacing: -0.2,
           ),
         ),
         content: Text(
@@ -151,6 +398,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
           style: GoogleFonts.dmSans(
             fontSize: 16,
             color: Colors.grey[600],
+            letterSpacing: -0.2,
           ),
         ),
         actions: [
@@ -161,6 +409,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               style: GoogleFonts.dmSans(
                 fontSize: 16,
                 color: Colors.grey[600],
+                letterSpacing: -0.2,
               ),
             ),
           ),
@@ -175,6 +424,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 fontSize: 16,
                 color: Colors.red,
                 fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
               ),
             ),
           ),
@@ -200,7 +450,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: Colors.black,
-            letterSpacing: 0,
+            letterSpacing: -0.2,
           ),
         ),
         actions: [
@@ -227,7 +477,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Colors.black,
-                  letterSpacing: 0,
+                  letterSpacing: -0.2,
                 ),
               ),
             ),
@@ -261,7 +511,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
                           color: Colors.black,
-                          letterSpacing: 0,
+                          letterSpacing: -0.2,
                         ),
                       ),
                     )
@@ -271,7 +521,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                         color: Colors.black,
-                        letterSpacing: 0,
+                        letterSpacing: -0.2,
                       ),
                       decoration: InputDecoration(
                         hintText: 'Task title...',
@@ -279,7 +529,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
                           color: Colors.grey[400],
-                          letterSpacing: 0,
+                          letterSpacing: -0.2,
                         ),
                         border: InputBorder.none,
                       ),
@@ -297,7 +547,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                           style: GoogleFonts.dmSans(
                             fontSize: 16,
                             color: _notesController.text.isEmpty ? Colors.grey[500] : Colors.black,
-                            letterSpacing: 0,
+                            letterSpacing: -0.2,
                             height: 1.5,
                           ),
                         ),
@@ -310,7 +560,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                         style: GoogleFonts.dmSans(
                           fontSize: 16,
                           color: Colors.black,
-                          letterSpacing: 0,
+                          letterSpacing: -0.2,
                           height: 1.5,
                         ),
                         decoration: InputDecoration(
@@ -318,7 +568,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                           hintStyle: GoogleFonts.dmSans(
                             fontSize: 16,
                             color: Colors.grey[500],
-                            letterSpacing: 0,
+                            letterSpacing: -0.2,
                           ),
                           border: InputBorder.none,
                         ),
@@ -326,7 +576,161 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
               ),
             ),
             
-            // Optional settings at bottom
+            // Attachment section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: Color(0xFFE5E5E5),
+                    width: 0.5,
+                  ),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Attachments',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Voice note button
+                      GestureDetector(
+                        onTap: _toggleVoiceRecording,
+                        child: AnimatedBuilder(
+                          animation: _pulseAnimationController,
+                          builder: (context, child) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _isRecording ? Colors.red.withOpacity(0.1) : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: _isRecording ? Colors.red : Colors.grey[300]!,
+                                  width: 1,
+                                ),
+                                boxShadow: _isRecording ? [
+                                  BoxShadow(
+                                    color: Colors.red.withOpacity(0.2 * _pulseAnimationController.value),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  ),
+                                ] : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  AnimatedBuilder(
+                                    animation: _recordingAnimationController,
+                                    builder: (context, child) {
+                                      return Transform.scale(
+                                        scale: 1.0 + (_recordingAnimationController.value * 0.1),
+                                        child: Icon(
+                                          _isRecording ? Icons.stop : Icons.mic,
+                                          size: 16,
+                                          color: _isRecording ? Colors.red : Colors.grey[600],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _isRecording ? '0:${_recordingSeconds.toString().padLeft(2, '0')}' : 'Voice',
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: _isRecording ? Colors.red : Colors.grey[600],
+                                      letterSpacing: -0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // File attachment button
+                      GestureDetector(
+                        onTap: _showAttachmentOptions,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.grey[300]!,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.attach_file,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'File',
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  // Display attachments grid
+                  if (_attachments.isNotEmpty || _voiceNotes.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        // Voice notes
+                        ...(_voiceNotes.map((note) => _buildAttachmentCard(
+                          type: 'voice',
+                          name: note,
+                          onRemove: () {
+                            setState(() {
+                              _voiceNotes.remove(note);
+                            });
+                          },
+                        ))),
+                        // File attachments
+                        ...(_attachments.map((attachment) => _buildAttachmentCard(
+                          type: 'file',
+                          name: attachment,
+                          onRemove: () {
+                            setState(() {
+                              _attachments.remove(attachment);
+                            });
+                          },
+                        ))),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            
+            // Additional options section
             Container(
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
@@ -347,7 +751,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                         style: GoogleFonts.dmSans(
                           fontSize: 14,
                           color: Colors.grey[600],
-                          letterSpacing: 0,
+                          letterSpacing: -0.2,
                         ),
                       ),
                       if (widget.isViewMode && !_isEditMode)
@@ -355,7 +759,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       else ...[
                         _buildPriorityChip('high', 'High', Colors.red),
                         const SizedBox(width: 8),
-                        _buildPriorityChip('medium', 'Medium', Colors.orange),
+                        _buildPriorityChip('medium', 'Medium', Colors.grey[600]!),
                         const SizedBox(width: 8),
                         _buildPriorityChip('low', 'Low', Colors.green),
                       ],
@@ -374,7 +778,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                           style: GoogleFonts.dmSans(
                             fontSize: 14,
                             color: Colors.grey[600],
-                            letterSpacing: 0,
+                            letterSpacing: -0.2,
                           ),
                         ),
                         Text(
@@ -382,7 +786,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                           style: GoogleFonts.dmSans(
                             fontSize: 14,
                             color: Colors.black,
-                            letterSpacing: 0,
+                            letterSpacing: -0.2,
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -394,10 +798,174 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       ],
                     ),
                   ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Tag selection
+                  Row(
+                    children: [
+                      Text(
+                        'Tag: ',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            GestureDetector(
+                              onTap: () => setState(() => _selectedTag = 'work'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _selectedTag == 'work' ? Colors.black : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  'Work',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: _selectedTag == 'work' ? Colors.white : Colors.grey[600],
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => setState(() => _selectedTag = 'personal'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: _selectedTag == 'personal' ? Colors.black : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
+                                  'Personal',
+                                  style: GoogleFonts.dmSans(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: _selectedTag == 'personal' ? Colors.white : Colors.grey[600],
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  // Voice notes are now handled in the attachments grid above
+                  // Removed duplicate blue voice file display
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentCard({
+    required String type,
+    required String name,
+    required VoidCallback onRemove,
+  }) {
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.grey[200]!,
+          width: 1,
+        ),
+      ),
+      child: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  type == 'voice' ? Icons.mic : Icons.insert_drive_file,
+                  size: 24,
+                  color: type == 'voice' ? Colors.blue[600] : Colors.grey[600],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  name.length > 8 ? '${name.substring(0, 8)}...' : name,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 10,
+                    color: Colors.grey[600],
+                    letterSpacing: -0.2,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.close,
+                  size: 12,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTagChip(String value, String label) {
+    final isSelected = _selectedTag == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedTag = value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.black : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? Colors.black : Colors.grey[300]!,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.dmSans(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: isSelected ? Colors.white : Colors.grey[600],
+            letterSpacing: -0.2,
+          ),
         ),
       ),
     );
@@ -438,7 +1006,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: _selectedPriority == priority ? color : Colors.grey[600],
-                letterSpacing: 0,
+                letterSpacing: -0.2,
               ),
             ),
           ],
@@ -456,7 +1024,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
         label = 'High';
         break;
       case 'medium':
-        color = Colors.orange;
+        color = Colors.grey[600]!;
         label = 'Medium';
         break;
       case 'low':
@@ -486,7 +1054,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             fontSize: 12,
             fontWeight: FontWeight.w500,
             color: color,
-            letterSpacing: 0,
+            letterSpacing: -0.2,
           ),
         ),
       ],
@@ -513,7 +1081,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             color: isSelected ? Colors.white : Colors.grey[700],
-            letterSpacing: 0,
+            letterSpacing: -0.2,
           ),
         ),
       ),

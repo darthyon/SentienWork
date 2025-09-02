@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'welcome_screen.dart';
 import 'journey_selection_screen.dart';
 import 'goal_questions_screen.dart';
+import 'work_email_verification_screen.dart';
+import 'education_credentials_screen.dart';
 import 'permissions_screen.dart';
 import 'daily_motivation_screen.dart';
 import 'ben_introduction_screen.dart';
@@ -19,7 +21,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   String? _selectedMode;
 
   void _nextPage() {
-    if (_currentPage < 5) {
+    if (_currentPage < 7) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -68,6 +70,14 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
             mode: _selectedMode ?? 'guided',
             onAnswersSubmitted: _onAnswersSubmitted,
             onContinue: _nextPage,
+          ),
+          WorkEmailVerificationScreen(
+            onContinue: _nextPage,
+            onSkip: _nextPage,
+          ),
+          EducationCredentialsScreen(
+            onContinue: _nextPage,
+            onSkip: _nextPage,
           ),
           PermissionsScreen(
             onFinishSetup: _nextPage,

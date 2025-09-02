@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/ask_ben_button.dart';
+import 'ben_weekly_report_screen.dart';
+import 'settings_screen.dart';
 
 class MyJourneyScreen extends StatefulWidget {
   const MyJourneyScreen({super.key});
@@ -62,12 +64,17 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
                     
                     const SizedBox(height: 24),
                     
-                    // 4. Milestones Section
+                    // 4. Weekly Report Section
+                    _buildWeeklyReportSection(),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // 5. Milestones Section
                     _buildMilestonesSection(),
                     
                     const SizedBox(height: 24),
                     
-                    // 5. Assessments Section
+                    // 6. Assessments Section
                     _buildAssessmentsSection(),
                     
                     const SizedBox(height: 40),
@@ -131,7 +138,12 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
         // Settings icon
         IconButton(
           onPressed: () {
-            // TODO: Settings functionality
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const SettingsScreen(),
+              ),
+            );
           },
           icon: Icon(
             Icons.settings,
@@ -203,16 +215,16 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
   Widget _buildStatsRow() {
     return Row(
       children: [
-        Expanded(child: _buildStatCard('7', 'Day Streak', Icons.local_fire_department)),
+        Expanded(child: _buildStatCard('7', 'Day Streak', Icons.local_fire_department, Colors.grey[600]!)),
         const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('24', 'Tasks Done', Icons.check_circle)),
+        Expanded(child: _buildStatCard('24', 'Tasks Done', Icons.check_circle, Colors.green)),
         const SizedBox(width: 12),
-        Expanded(child: _buildStatCard('3', 'Badges', Icons.workspace_premium)),
+        Expanded(child: _buildStatCard('3', 'Badges', Icons.workspace_premium, Colors.blue)),
       ],
     );
   }
   
-  Widget _buildStatCard(String number, String label, IconData icon) {
+  Widget _buildStatCard(String number, String label, IconData icon, Color iconColor) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -231,7 +243,7 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
           Icon(
             icon,
             size: 24,
-            color: Colors.grey[700],
+            color: iconColor,
           ),
           const SizedBox(height: 8),
           Text(
@@ -255,6 +267,104 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
           ),
         ],
       ),
+    );
+  }
+  
+  Widget _buildWeeklyReportSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Weekly Report',
+          style: GoogleFonts.dmSans(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Image on top - responsive size with 175x175 minimum
+              Container(
+                width: MediaQuery.of(context).size.width > 400 ? 175 : 175,
+                height: MediaQuery.of(context).size.width > 400 ? 175 : 175,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'images/img-weekly.png',
+                    width: MediaQuery.of(context).size.width > 400 ? 175 : 175,
+                    height: MediaQuery.of(context).size.width > 400 ? 175 : 175,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Text content
+              Text(
+                'You\'ve been crossing off tasks so fast, your future self just sent a thank-you card.',
+                style: GoogleFonts.dmSans(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                  letterSpacing: 0,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const BenWeeklyReportScreen(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  child: Text(
+                    'View Ben\'s Full Report',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
   

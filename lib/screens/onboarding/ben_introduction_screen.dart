@@ -23,9 +23,13 @@ class _BenIntroductionScreenState extends State<BenIntroductionScreen>
     with TickerProviderStateMixin {
   int _currentStep = 0;
   String? _selectedTone;
-  bool _showToneSelection = true;
+  bool _showToneSelection = false;
+  bool _showIntro = true;
+  bool _showToneQuestion = false;
   late AnimationController _fadeController;
+  late AnimationController _fadeOutController;
   late Animation<double> _fadeAnimation;
+  late Animation<double> _fadeOutAnimation;
 
   final List<String> _conversationSteps = [
     "Hi, I'm Ben.",
@@ -51,22 +55,65 @@ class _BenIntroductionScreenState extends State<BenIntroductionScreen>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
+    _fadeOutController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
+    );
+    _fadeOutAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _fadeOutController, curve: Curves.easeOut),
     );
     
     _startConversation();
   }
 
   void _startConversation() async {
-    for (int i = 0; i < _conversationSteps.length; i++) {
-      await Future.delayed(Duration(milliseconds: i == 0 ? 500 : 2000));
+    // Show first intro message
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      setState(() {
+        _currentStep = 0;
+      });
+      _fadeController.reset();
+      _fadeController.forward();
+    }
+    
+    // Show second intro message
+    await Future.delayed(const Duration(milliseconds: 2000));
+    if (mounted) {
+      setState(() {
+        _currentStep = 1;
+      });
+      _fadeController.reset();
+      _fadeController.forward();
+    }
+    
+    // Wait, then fade out intro and show tone question
+    await Future.delayed(const Duration(milliseconds: 2500));
+    if (mounted) {
+      // Start fade out of intro
+      _fadeOutController.forward();
+      
+      // After fade out completes, show tone question
+      await Future.delayed(const Duration(milliseconds: 600));
       if (mounted) {
         setState(() {
-          _currentStep = i;
+          _showIntro = false;
+          _showToneQuestion = true;
+          _currentStep = 2;
         });
         _fadeController.reset();
         _fadeController.forward();
+        
+        // Show tone selection cards after question appears
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          setState(() {
+            _showToneSelection = true;
+          });
+        }
       }
     }
   }
@@ -77,8 +124,19 @@ class _BenIntroductionScreenState extends State<BenIntroductionScreen>
       _showToneSelection = false;
     });
     
-    // Start showing tone response messages
-    _showToneResponses(tone);
+    // Fade out tone question first
+    _fadeOutController.reset();
+    _fadeOutController.forward();
+    
+    // After fade out, start showing tone response messages
+    Timer(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        setState(() {
+          _showToneQuestion = false;
+        });
+        _showToneResponses(tone);
+      }
+    });
   }
 
   void _showToneResponses(String tone) {
@@ -162,19 +220,62 @@ class _BenIntroductionScreenState extends State<BenIntroductionScreen>
                       ),
                     ),
                     
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 24),
                     
                     // Conversation content
-                    SizedBox(
-                      height: 200,
+                    Flexible(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
-                          if (_currentStep >= 0)
+                          // Show intro messages with fade out
+                          if (_showIntro)
                             FadeTransition(
-                              opacity: _currentStep == 0 ? _fadeAnimation : const AlwaysStoppedAnimation(1.0),
+                              opacity: _fadeOutAnimation,
+                              child: Column(
+                                children: [
+                                  if (_currentStep >= 0)
+                                    FadeTransition(
+                                      opacity: _currentStep == 0 ? _fadeAnimation : const AlwaysStoppedAnimation(1.0),
+                                      child: Text(
+                                        _conversationSteps[0],
+                                        style: GoogleFonts.dmSans(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black,
+                                          height: 1.3,
+                                          letterSpacing: -0.3,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  
+                                  if (_currentStep >= 1) ...[
+                                    const SizedBox(height: 24),
+                                    FadeTransition(
+                                      opacity: _currentStep == 1 ? _fadeAnimation : const AlwaysStoppedAnimation(1.0),
+                                      child: Text(
+                                        _conversationSteps[1],
+                                        style: GoogleFonts.dmSans(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.normal,
+                                          color: Colors.black87,
+                                          height: 1.4,
+                                          letterSpacing: 0,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          
+                          // Show tone question after intro fades out
+                          if (_showToneQuestion)
+                            FadeTransition(
+                              opacity: _selectedTone == null ? _fadeAnimation : _fadeOutAnimation,
                               child: Text(
-                                _conversationSteps[0],
+                                _conversationSteps[2],
                                 style: GoogleFonts.dmSans(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w600,
@@ -185,48 +286,12 @@ class _BenIntroductionScreenState extends State<BenIntroductionScreen>
                                 textAlign: TextAlign.center,
                               ),
                             ),
-                          
-                          if (_currentStep >= 1) ...[
-                            const SizedBox(height: 24),
-                            FadeTransition(
-                              opacity: _currentStep == 1 ? _fadeAnimation : const AlwaysStoppedAnimation(1.0),
-                              child: Text(
-                                _conversationSteps[1],
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.normal,
-                                  color: Colors.black87,
-                                  height: 1.4,
-                                  letterSpacing: 0,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                          
-                          if (_currentStep >= 2) ...[
-                            const SizedBox(height: 32),
-                            FadeTransition(
-                              opacity: _currentStep == 2 ? _fadeAnimation : const AlwaysStoppedAnimation(1.0),
-                              child: Text(
-                                _conversationSteps[2],
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black,
-                                  height: 1.4,
-                                  letterSpacing: 0,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
                     
                     // Tone selection cards (only show if no tone selected and showing tone selection)
-                    if (_currentStep >= 2 && _selectedTone == null && _showToneSelection) ...[
+                    if (_showToneQuestion && _selectedTone == null && _showToneSelection) ...[
                       const SizedBox(height: 24),
                       AnimatedOpacity(
                         opacity: _showToneSelection ? 1.0 : 0.0,
@@ -257,17 +322,17 @@ class _BenIntroductionScreenState extends State<BenIntroductionScreen>
                     
                     // Show additional conversation steps after tone selection
                     if (_currentStep > 2) ...[
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
                       FadeTransition(
                         opacity: _fadeAnimation,
                         child: Text(
                           _conversationSteps[_currentStep],
                           style: GoogleFonts.dmSans(
-                            fontSize: 18,
-                            fontWeight: FontWeight.normal,
-                            color: Colors.black87,
-                            height: 1.4,
-                            letterSpacing: 0,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                            height: 1.3,
+                            letterSpacing: -0.3,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -304,6 +369,7 @@ class _BenIntroductionScreenState extends State<BenIntroductionScreen>
   @override
   void dispose() {
     _fadeController.dispose();
+    _fadeOutController.dispose();
     super.dispose();
   }
 }

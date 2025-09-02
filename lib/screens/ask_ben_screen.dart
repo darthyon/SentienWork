@@ -12,16 +12,28 @@ class AskBenScreen extends StatefulWidget {
 class _AskBenScreenState extends State<AskBenScreen>
     with TickerProviderStateMixin {
   int _currentStep = 0;
+  String? _selectedDayRating;
   String? _selectedMood;
-  bool? _wantsActionItems;
+  bool? _wantsDaySummary;
   List<String> _actionItems = [];
+  String? _currentQuestion;
+  bool _showOptions = false;
   
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
+  late AnimationController _optionsController;
+  late Animation<double> _optionsAnimation;
 
   final List<String> _conversationSteps = [
-    "Hey there! How are you feeling today?",
-    "I noticed you had a meeting at 11am. Do you want to create action items from it?",
+    "How is your day going so far?",
+    "How are you feeling today?",
+    "Would you like to see a summary of what you're going to do for the day and what you should start off with?",
+  ];
+
+  final List<Map<String, dynamic>> _dayRatingOptions = [
+    {'label': 'Bad', 'value': 'bad'},
+    {'label': 'Could be better', 'value': 'could_be_better'},
+    {'label': 'Great', 'value': 'great'},
   ];
 
   final List<Map<String, dynamic>> _moodOptions = [
@@ -31,6 +43,26 @@ class _AskBenScreenState extends State<AskBenScreen>
     {'emoji': '😊', 'label': 'Happy', 'value': 'happy'},
     {'emoji': '😄', 'label': 'Very Happy', 'value': 'very_happy'},
   ];
+
+  final Map<String, List<String>> _dynamicQuestions = {
+    'bad': [
+      "How is your day going so far?",
+      "That sounds tough — days like that can really drain you.",
+      "How does that make you feel?",
+      "Would you like to see a summary of what you're going to do for the day and what you should start off with?",
+    ],
+    'could_be_better': [
+      "How is your day going so far?",
+      "I understand — some days just feel off, don't they?",
+      "How does that make you feel?",
+      "Would you like to see a summary of what you're going to do for the day and what you should start off with?",
+    ],
+    'great': [
+      "How is your day going so far?",
+      "How are you feeling today?",
+      "Would you like to see a summary of what you're going to do for the day and what you should start off with?",
+    ],
+  };
 
   @override
   void initState() {
@@ -42,6 +74,13 @@ class _AskBenScreenState extends State<AskBenScreen>
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
     );
+    _optionsController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _optionsAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _optionsController, curve: Curves.easeIn),
+    );
     
     _startConversation();
   }
@@ -51,36 +90,126 @@ class _AskBenScreenState extends State<AskBenScreen>
     if (mounted) {
       setState(() {
         _currentStep = 0;
+        _currentQuestion = _dynamicQuestions['bad']![0];
       });
       _fadeController.forward();
+      
+      // Show options after question appears
+      await Future.delayed(const Duration(milliseconds: 1000));
+      if (mounted) {
+        setState(() {
+          _showOptions = true;
+        });
+        _optionsController.forward();
+      }
+    }
+  }
+
+  void _selectDayRating(String rating) {
+    setState(() {
+      _selectedDayRating = rating;
+      _showOptions = false;
+    });
+    
+    _optionsController.reset();
+    
+    // For bad/could_be_better, show empathetic response first
+    if (rating == 'bad' || rating == 'could_be_better') {
+      Timer(const Duration(milliseconds: 1000), () {
+        if (mounted) {
+          setState(() {
+            _currentStep = 1;
+            _currentQuestion = _dynamicQuestions[rating]![1];
+          });
+          _fadeController.reset();
+          _fadeController.forward();
+          
+          // Show the actual mood question after empathetic response
+          Timer(const Duration(milliseconds: 2500), () {
+            if (mounted) {
+              setState(() {
+                _currentStep = 2;
+                _currentQuestion = _dynamicQuestions[rating]![2];
+              });
+              _fadeController.reset();
+              _fadeController.forward();
+              
+              // Show mood options
+              Timer(const Duration(milliseconds: 1000), () {
+                if (mounted) {
+                  setState(() {
+                    _showOptions = true;
+                  });
+                  _optionsController.forward();
+                }
+              });
+            }
+          });
+        }
+      });
+    } else {
+      // For great, go directly to mood question
+      Timer(const Duration(milliseconds: 1000), () {
+        if (mounted) {
+          setState(() {
+            _currentStep = 1;
+            _currentQuestion = _dynamicQuestions[rating]![1];
+          });
+          _fadeController.reset();
+          _fadeController.forward();
+          
+          Timer(const Duration(milliseconds: 1000), () {
+            if (mounted) {
+              setState(() {
+                _showOptions = true;
+              });
+              _optionsController.forward();
+            }
+          });
+        }
+      });
     }
   }
 
   void _selectMood(String mood) {
     setState(() {
       _selectedMood = mood;
+      _showOptions = false;
     });
     
-    // Move to next question after a brief delay
-    Timer(const Duration(milliseconds: 1500), () {
+    _optionsController.reset();
+    
+    // Move to day summary question after a brief delay
+    Timer(const Duration(milliseconds: 1000), () {
       if (mounted) {
+        final questionIndex = _selectedDayRating == 'bad' || _selectedDayRating == 'could_be_better' ? 3 : 2;
         setState(() {
-          _currentStep = 1;
+          _currentStep = questionIndex;
+          _currentQuestion = _dynamicQuestions[_selectedDayRating]![questionIndex];
         });
         _fadeController.reset();
         _fadeController.forward();
+        
+        Timer(const Duration(milliseconds: 1000), () {
+          if (mounted) {
+            setState(() {
+              _showOptions = true;
+            });
+            _optionsController.forward();
+          }
+        });
       }
     });
   }
 
-  void _selectActionItems(bool wants) {
+  void _selectDaySummary(bool wants) {
     setState(() {
-      _wantsActionItems = wants;
+      _wantsDaySummary = wants;
     });
     
     if (wants) {
-      // Generate sample action items
-      _generateActionItems();
+      // Generate sample day summary
+      _generateDaySummary();
     } else {
       // Close after a brief delay
       Timer(const Duration(milliseconds: 1500), () {
@@ -91,32 +220,15 @@ class _AskBenScreenState extends State<AskBenScreen>
     }
   }
 
-  void _generateActionItems() {
+  void _generateDaySummary() {
     setState(() {
       _actionItems = [
-        'Follow up with Sarah about Q4 budget',
-        'Schedule design review meeting',
-        'Update project timeline document',
-        'Send meeting notes to stakeholders',
+        'Start with your quarterly goals review',
+        'Prepare key points for your boss meeting',
+        'Focus on the project proposal in the afternoon',
+        'End the day with some exercise',
       ];
     });
-  }
-
-  void _addActionItem(String item) {
-    setState(() {
-      _actionItems.add(item);
-    });
-  }
-
-  void _removeActionItem(int index) {
-    setState(() {
-      _actionItems.removeAt(index);
-    });
-  }
-
-  void _createTasks() {
-    // TODO: Convert action items to actual tasks
-    Navigator.pop(context);
   }
 
   @override
@@ -172,11 +284,11 @@ class _AskBenScreenState extends State<AskBenScreen>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          if (_currentStep >= 0)
+                          if (_currentQuestion != null)
                             FadeTransition(
                               opacity: _fadeAnimation,
                               child: Text(
-                                _conversationSteps[_currentStep],
+                                _currentQuestion!,
                                 style: GoogleFonts.dmSans(
                                   fontSize: 24,
                                   fontWeight: FontWeight.w600,
@@ -191,111 +303,154 @@ class _AskBenScreenState extends State<AskBenScreen>
                       ),
                     ),
                     
-                    // Mood selection (step 0)
-                    if (_currentStep == 0 && _selectedMood == null) ...[
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: _moodOptions.map((mood) {
-                          return GestureDetector(
-                            onTap: () => _selectMood(mood['value']),
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 50,
-                                  height: 50,
+                    // Day rating selection (step 0)
+                    if (_currentStep == 0 && _selectedDayRating == null && _showOptions) ...[
+                      const SizedBox(height: 32),
+                      FadeTransition(
+                        opacity: _optionsAnimation,
+                        child: Column(
+                          children: _dayRatingOptions.map((rating) {
+                            return Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: GestureDetector(
+                                onTap: () => _selectDayRating(rating['value']),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.grey[300]!,
-                                      width: 1,
-                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.grey[300]!),
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      mood['emoji'],
-                                      style: const TextStyle(fontSize: 24),
+                                  child: Text(
+                                    rating['label'],
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                      letterSpacing: 0,
                                     ),
+                                    textAlign: TextAlign.center,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  mood['label'],
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                    letterSpacing: 0,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ],
                     
-                    // Action items question (step 1)
-                    if (_currentStep == 1 && _wantsActionItems == null) ...[
+                    // Mood selection (step 2)
+                    if (_currentStep == 2 && _selectedMood == null && _showOptions) ...[
+                      const SizedBox(height: 24),
+                      FadeTransition(
+                        opacity: _optionsAnimation,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: _moodOptions.map((mood) {
+                            return GestureDetector(
+                              onTap: () => _selectMood(mood['value']),
+                              child: Column(
+                                children: [
+                                  Container(
+                                    width: 50,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.grey[300]!,
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        mood['emoji'],
+                                        style: const TextStyle(fontSize: 24),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    mood['label'],
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                    
+                    // Day summary question (step 3)
+                    if (_currentStep == 3 && _wantsDaySummary == null && _showOptions) ...[
                       const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => _selectActionItems(true),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: Text(
-                                  'Yes, please',
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                    letterSpacing: 0,
+                      FadeTransition(
+                        opacity: _optionsAnimation,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => _selectDaySummary(true),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.grey[300]!),
                                   ),
-                                  textAlign: TextAlign.center,
+                                  child: Text(
+                                    'Yes, please',
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                      letterSpacing: 0,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => _selectActionItems(false),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.grey[300]!),
-                                ),
-                                child: Text(
-                                  'No, thanks',
-                                  style: GoogleFonts.dmSans(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black,
-                                    letterSpacing: 0,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => _selectDaySummary(false),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.grey[300]!),
                                   ),
-                                  textAlign: TextAlign.center,
+                                  child: Text(
+                                    'No, thanks',
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                      letterSpacing: 0,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                     
-                    // Action items list
-                    if (_wantsActionItems == true && _actionItems.isNotEmpty) ...[
+                    // Day summary display
+                    if (_wantsDaySummary == true && _actionItems.isNotEmpty) ...[
                       const SizedBox(height: 32),
                       Text(
-                        'Here are the action items I found:',
+                        'Here\'s your day at a glance:',
                         style: GoogleFonts.dmSans(
                           fontSize: 18,
                           fontWeight: FontWeight.w500,
@@ -320,6 +475,15 @@ class _AskBenScreenState extends State<AskBenScreen>
                               ),
                               child: Row(
                                 children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                       _actionItems[index],
@@ -330,14 +494,6 @@ class _AskBenScreenState extends State<AskBenScreen>
                                       ),
                                     ),
                                   ),
-                                  GestureDetector(
-                                    onTap: () => _removeActionItem(index),
-                                    child: Icon(
-                                      Icons.remove_circle_outline,
-                                      color: Colors.red[400],
-                                      size: 20,
-                                    ),
-                                  ),
                                 ],
                               ),
                             );
@@ -346,7 +502,7 @@ class _AskBenScreenState extends State<AskBenScreen>
                       ),
                       const SizedBox(height: 16),
                       GestureDetector(
-                        onTap: _createTasks,
+                        onTap: () => Navigator.pop(context),
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -355,7 +511,7 @@ class _AskBenScreenState extends State<AskBenScreen>
                             borderRadius: BorderRadius.circular(25),
                           ),
                           child: Text(
-                            'Create Tasks',
+                            'Got it!',
                             style: GoogleFonts.dmSans(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -382,6 +538,7 @@ class _AskBenScreenState extends State<AskBenScreen>
   @override
   void dispose() {
     _fadeController.dispose();
+    _optionsController.dispose();
     super.dispose();
   }
 }

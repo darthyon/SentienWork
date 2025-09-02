@@ -26,67 +26,102 @@ class _MainAppScreenState extends State<MainAppScreen> {
   ];
 
   void _showAddActionSheet() {
-    showCupertinoModalPopup(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => CupertinoActionSheet(
-        actions: [
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              Navigator.pop(context);
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddTaskScreen(),
-                ),
-              );
-              if (result != null) {
-                // TODO: Add task to data model
-                print('New task created: $result');
-              }
-            },
-            child: Text(
-              'Add Task',
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Create New',
               style: GoogleFonts.dmSans(
                 fontSize: 18,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+                letterSpacing: -0.2,
               ),
             ),
-          ),
-          CupertinoActionSheetAction(
-            onPressed: () async {
-              Navigator.pop(context);
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AddNoteScreen(),
-                ),
-              );
-              if (result != null) {
-                // TODO: Add note to data model
-                print('New note created: $result');
-              }
-            },
-            child: Text(
-              'Add Note',
+            const SizedBox(height: 20),
+            _buildAddOption(
+              icon: Icons.task_alt,
+              title: 'Add Task',
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddTaskScreen(),
+                  ),
+                );
+                
+                if (result != null) {
+                  // Handle the returned task data
+                  print('New task created: $result');
+                }
+              },
+            ),
+            _buildAddOption(
+              icon: Icons.note_add,
+              title: 'Add Note',
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AddNoteScreen(),
+                  ),
+                );
+                
+                if (result != null) {
+                  // Handle the returned note data
+                  print('New note created: $result');
+                }
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildAddOption({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.grey[600]),
+            const SizedBox(width: 16),
+            Text(
+              title,
               style: GoogleFonts.dmSans(
-                fontSize: 18,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0,
+                fontSize: 16,
+                color: Colors.grey[700],
+                letterSpacing: -0.2,
               ),
             ),
-          ),
-        ],
-        cancelButton: CupertinoActionSheetAction(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            'Cancel',
-            style: GoogleFonts.dmSans(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0,
-            ),
-          ),
+          ],
         ),
       ),
     );

@@ -142,14 +142,21 @@ class _GoalQuestionsScreenState extends State<GoalQuestionsScreen> {
                     ),
                   ),
                 ),
-                child: CupertinoDatePicker(
-                  mode: CupertinoDatePickerMode.date,
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: Theme.of(context).colorScheme.copyWith(
+                      primary: Colors.grey[600],
+                    ),
+                  ),
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.date,
                   initialDateTime: _customDate ?? DateTime.now().add(const Duration(days: 365)),
                   minimumDate: DateTime.now(),
                   maximumDate: DateTime.now().add(const Duration(days: 3650)), // 10 years
                   onDateTimeChanged: (date) {
                     _customDate = date;
                   },
+                ),
                 ),
               ),
             ),
