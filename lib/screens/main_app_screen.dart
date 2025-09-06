@@ -16,10 +16,25 @@ class MainAppScreen extends StatefulWidget {
 }
 
 class _MainAppScreenState extends State<MainAppScreen> {
-  int _currentIndex = 0;
+  int _selectedIndex = 0;
+  final GlobalKey _myDayKey = GlobalKey();
+  bool _benTooltipDismissedThisSession = false;
 
-  final List<Widget> _screens = [
-    const MyDayScreen(),
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  List<Widget> get _screens => [
+    MyDayScreen(
+      key: _myDayKey,
+      benTooltipDismissedThisSession: _benTooltipDismissedThisSession,
+      onBenTooltipDismissed: () {
+        setState(() {
+          _benTooltipDismissedThisSession = true;
+        });
+      },
+    ),
     const NotesScreen(),
     const GrowScreen(),
     const MyJourneyScreen(),
@@ -54,18 +69,11 @@ class _MainAppScreenState extends State<MainAppScreen> {
             _buildAddOption(
               icon: Icons.task_alt,
               title: 'Add Task',
-              onTap: () async {
+              onTap: () {
                 Navigator.pop(context);
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AddTaskScreen(),
-                  ),
-                );
-                
-                if (result != null) {
-                  // Handle the returned task data
-                  print('New task created: $result');
+                // Trigger inline task creation on My Day screen
+                if (_selectedIndex == 0 && _myDayKey.currentState != null) {
+                  (_myDayKey.currentState as dynamic).startCreatingNewTask();
                 }
               },
             ),
@@ -130,7 +138,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: _screens[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(
@@ -141,10 +149,10 @@ class _MainAppScreenState extends State<MainAppScreen> {
           ),
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentIndex,
+          currentIndex: _selectedIndex,
           onTap: (index) {
             setState(() {
-              _currentIndex = index;
+              _selectedIndex = index;
             });
           },
           type: BottomNavigationBarType.fixed,

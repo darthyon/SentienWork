@@ -6,9 +6,9 @@ import 'screens/onboarding/onboarding_flow.dart';
 import 'screens/main_app_screen.dart';
 
 void main() {
-  // Set status bar to light content (white icons/text)
+  // Set status bar to white background with dark icons
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
+    statusBarColor: Colors.white,
     statusBarIconBrightness: Brightness.dark,
     statusBarBrightness: Brightness.light,
   ));
@@ -21,25 +21,44 @@ class SentienWorkApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SentienWork',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.black),
-        useMaterial3: true,
-        textTheme: GoogleFonts.dmSansTextTheme(),
-        cupertinoOverrideTheme: CupertinoThemeData(
-          primaryColor: Colors.grey[600],
-          textTheme: CupertinoTextThemeData(
-            actionTextStyle: TextStyle(color: Colors.grey[600]),
-            dateTimePickerTextStyle: TextStyle(color: Colors.black),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: MaterialApp(
+        title: 'SentienWork',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.black),
+          useMaterial3: true,
+          textTheme: GoogleFonts.dmSansTextTheme(),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            surfaceTintColor: Colors.white,
+            systemOverlayStyle: SystemUiOverlayStyle(
+              statusBarColor: Colors.white,
+              statusBarIconBrightness: Brightness.dark,
+              statusBarBrightness: Brightness.light,
+            ),
+          ),
+          cupertinoOverrideTheme: CupertinoThemeData(
+            primaryColor: Colors.grey[600],
+            textTheme: CupertinoTextThemeData(
+              actionTextStyle: TextStyle(color: Colors.grey[600]),
+              dateTimePickerTextStyle: TextStyle(color: Colors.black),
+            ),
           ),
         ),
+        home: const OnboardingFlow(),
+        routes: {
+          '/home': (context) => const MainAppScreen(),
+        },
+        debugShowCheckedModeBanner: false,
       ),
-      home: const OnboardingFlow(),
-      routes: {
-        '/home': (context) => const MainAppScreen(),
-      },
-      debugShowCheckedModeBanner: false,
     );
   }
 }

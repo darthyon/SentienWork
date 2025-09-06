@@ -36,7 +36,7 @@ class SelectionCard extends StatelessWidget {
             Text(
               title,
               style: GoogleFonts.dmSans(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: isSelected ? Colors.white : Colors.black,
               ),

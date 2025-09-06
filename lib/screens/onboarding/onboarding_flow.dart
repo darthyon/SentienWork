@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'welcome_screen.dart';
-import 'journey_selection_screen.dart';
-import 'goal_questions_screen.dart';
-import 'work_email_verification_screen.dart';
-import 'education_credentials_screen.dart';
-import 'permissions_screen.dart';
-import 'daily_motivation_screen.dart';
 import 'ben_introduction_screen.dart';
+import 'personalize_experience_screen.dart';
+import 'linkedin_mock_screen.dart';
+import 'is_this_you_screen.dart';
+import 'work_details_screen.dart';
+import 'background_analysis_screen.dart';
+import 'goal_setting_screen.dart';
+import 'timeline_selection_screen.dart';
+import 'app_loading_screen.dart';
+import 'daily_motivation_screen.dart';
+import '../main_app_screen.dart';
 
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({super.key});
@@ -18,34 +22,38 @@ class OnboardingFlow extends StatefulWidget {
 class _OnboardingFlowState extends State<OnboardingFlow> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  String? _selectedMode;
+  bool _useLinkedIn = false;
 
   void _nextPage() {
-    if (_currentPage < 7) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-    } else {
-      // Complete onboarding
-      Navigator.of(context).pushReplacementNamed('/home');
-    }
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 1),
+      curve: Curves.linear,
+    );
   }
 
   void _skipToEnd() {
-    // Skip directly to main app
-    Navigator.of(context).pushReplacementNamed('/home');
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => const MainAppScreen()),
+    );
   }
 
-  void _onModeSelected(String mode) {
+  void _onLinkedInSelected() {
     setState(() {
-      _selectedMode = mode;
+      _useLinkedIn = true;
     });
+    _nextPage();
   }
 
-  void _onAnswersSubmitted(Map<String, String> answers) {
-    // Store answers for future use
-    // TODO: Save to local storage or state management
+  void _onManualSelected() {
+    setState(() {
+      _useLinkedIn = false;
+    });
+    // Skip LinkedIn mock screen, go to Is This You screen
+    _pageController.animateToPage(
+      4, // Is This You screen index
+      duration: const Duration(milliseconds: 1),
+      curve: Curves.linear,
+    );
   }
 
   @override
@@ -53,40 +61,76 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     return Scaffold(
       body: PageView(
         controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(), // Disable swipe navigation
         onPageChanged: (index) {
           setState(() {
             _currentPage = index;
           });
         },
         children: [
+          // 0: Welcome Screen
           WelcomeScreen(onGetStarted: _nextPage),
-          JourneySelectionScreen(
-            onModeSelected: _onModeSelected,
-            onContinue: _nextPage,
-            onSkip: _skipToEnd,
-            selectedMode: _selectedMode,
-          ),
-          GoalQuestionsScreen(
-            mode: _selectedMode ?? 'guided',
-            onAnswersSubmitted: _onAnswersSubmitted,
-            onContinue: _nextPage,
-          ),
-          WorkEmailVerificationScreen(
-            onContinue: _nextPage,
-            onSkip: _nextPage,
-          ),
-          EducationCredentialsScreen(
-            onContinue: _nextPage,
-            onSkip: _nextPage,
-          ),
-          PermissionsScreen(
-            onFinishSetup: _nextPage,
-            onSkip: _skipToEnd,
-          ),
-          DailyMotivationScreen(onContinue: _nextPage),
+          
+          // 1: Ben Introduction
           BenIntroductionScreen(
-            onSkip: () => Navigator.of(context).pushReplacementNamed('/home'),
+            onSkip: _skipToEnd,
             onGenerateTodos: _nextPage,
+          ),
+          
+          // 2: Personalize Experience
+          PersonalizeExperienceScreen(
+            onSkip: _skipToEnd,
+            onLinkedInSelected: _onLinkedInSelected,
+            onDoLaterSelected: _onManualSelected,
+          ),
+          
+          // 3: LinkedIn Mock (only if LinkedIn selected)
+          LinkedInMockScreen(
+            onSkip: _skipToEnd,
+            onContinue: _nextPage,
+          ),
+          
+          // 4: Personal Details (manual entry)
+          IsThisYouScreen(
+            onContinue: () => _nextPage(),
+            onSkip: () => _skipToEnd(),
+          ),
+          WorkDetailsScreen(
+            onContinue: () => _nextPage(),
+            onSkip: () => _skipToEnd(),
+          ),
+          
+          
+          // 6: Background Analysis
+          BackgroundAnalysisScreen(
+            onSkip: _skipToEnd,
+            onContinue: _nextPage,
+          ),
+          
+          // 7: Goal Setting
+          GoalSettingScreen(
+            onSkip: _skipToEnd,
+            onContinue: _nextPage,
+          ),
+          
+          // 8: Timeline Selection
+          TimelineSelectionScreen(
+            onSkip: _skipToEnd,
+            onContinue: _nextPage,
+          ),
+          
+          // 9: App Loading
+          AppLoadingScreen(
+            onComplete: _nextPage,
+          ),
+          
+          // 10: Daily Motivation
+          DailyMotivationScreen(
+            onContinue: () {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => const MainAppScreen()),
+              );
+            },
           ),
         ],
       ),

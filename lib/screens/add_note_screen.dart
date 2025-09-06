@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:path_provider/path_provider.dart';
 import 'add_note_screen_helper.dart';
 import '../models/note.dart';
 
@@ -25,14 +31,34 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
   bool _isRecording = false;
+  bool _isTranscribing = false;
   List<String> _attachments = [];
-  List<String> _voiceNotes = [];
+  List<Map<String, String>> _voiceNotes = []; // Enhanced to store audio + transcript
   bool _isEditMode = false;
   late AnimationController _recordingAnimationController;
   late AnimationController _pulseAnimationController;
   int _recordingSeconds = 0;
   Timer? _recordingTimer;
   String _selectedTag = 'work';
+  
+  // Speech-to-text functionality - COMMENTED OUT FOR iOS SIMULATOR TESTING
+  final Record _audioRecorder = Record();
+  // final stt.SpeechToText _speechToText = stt.SpeechToText();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  // bool _speechEnabled = false;
+  String _currentTranscript = '';
+  String? _currentPlayingPath;
+  bool _isPlaying = false;
+
+  // Mock transcription data for testing
+  final List<String> _mockTranscripts = [
+    "This is a mock transcription for testing purposes.",
+    "Here's another sample transcript to simulate speech-to-text functionality.",
+    "Meeting notes: Discussed project timeline and deliverables for Q4.",
+    "Remember to follow up with the client about the proposal by Friday.",
+    "Ideas for the presentation: focus on user experience and key metrics.",
+  ];
+  int _mockTranscriptIndex = 0;
 
   @override
   void initState() {
@@ -52,6 +78,58 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
       _titleController.text = widget.note!.title;
       _contentController.text = widget.note!.content;
     }
+    
+    _initSpeech();
+    _setupAudioPlayer();
+  }
+
+  void _initSpeech() async {
+    // COMMENTED OUT FOR iOS SIMULATOR TESTING
+    // Real speech-to-text initialization
+    /*
+    try {
+      print('Initializing speech-to-text...');
+      _speechEnabled = await _speechToText.initialize(
+        onError: (error) => print('Speech init error: $error'),
+        onStatus: (status) => print('Speech init status: $status'),
+      );
+      print('Speech-to-text initialized: $_speechEnabled');
+      
+      // Check if speech recognition is available
+      if (_speechEnabled) {
+        final locales = await _speechToText.locales();
+        print('Available locales: ${locales.length}');
+        final isAvailable = await _speechToText.hasPermission;
+        print('Has permission: $isAvailable');
+      }
+      
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print('Error initializing speech-to-text: $e');
+      _speechEnabled = false;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+    */
+    
+    // Mock initialization for simulator testing
+    print('Mock speech-to-text initialized for simulator testing');
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  void _setupAudioPlayer() {
+    _audioPlayer.onPlayerStateChanged.listen((PlayerState state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlayerState.playing;
+        });
+      }
+    });
   }
 
   @override
@@ -61,6 +139,8 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
     _recordingAnimationController.dispose();
     _pulseAnimationController.dispose();
     _recordingTimer?.cancel();
+    _audioRecorder.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -82,27 +162,208 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
     Navigator.pop(context, note);
   }
   
-  void _toggleVoiceRecording() {
-    setState(() {
-      _isRecording = !_isRecording;
-    });
+  Future<void> _toggleVoiceRecording() async {
+    print('Toggle voice recording called. Currently recording: $_isRecording');
     
-    if (_isRecording) {
+    if (!_isRecording) {
+      await _startRecording();
+    } else {
+      await _stopRecording();
+    }
+  }
+
+  Future<String> _getRecordingPath() async {
+    final directory = await getApplicationDocumentsDirectory();
+    return '${directory.path}/voice_note_${DateTime.now().millisecondsSinceEpoch}.m4a';
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      print('Starting recording process...');
+      
+      final path = await _getRecordingPath();
+      print('Recording to path: $path');
+      
+      await _audioRecorder.start(path: path);
+      print('Recording started successfully');
+      
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+          _currentTranscript = '';
+        });
+      }
+      
       _recordingAnimationController.forward();
       _pulseAnimationController.repeat();
-      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        setState(() {
-          _recordingSeconds++;
-        });
+      
+      // COMMENTED OUT FOR iOS SIMULATOR TESTING
+      // Real speech-to-text listening
+      /*
+      // Start speech-to-text if available, but don't fail if it doesn't work
+      if (_speechEnabled) {
+        print('Starting speech-to-text listening...');
+        print('Speech-to-text isListening: ${_speechToText.isListening}');
+        print('Speech-to-text isAvailable: ${_speechToText.isAvailable}');
+        
+        try {
+          final started = await _speechToText.listen(
+            onResult: (result) {
+              print('Speech result received: "${result.recognizedWords}" (confidence: ${result.confidence})');
+              if (mounted && result.recognizedWords.isNotEmpty) {
+                setState(() {
+                  _currentTranscript = result.recognizedWords;
+                });
+              }
+            },
+            onSoundLevelChange: (level) {
+              print('Sound level: $level');
+            },
+          );
+          print('Speech listening started: $started');
+        } catch (e) {
+          print('Speech-to-text listen failed: $e');
+        }
+      } else {
+        print('Speech-to-text not available, recording audio only');
+      }
+      */
+      
+      // Mock speech-to-text for simulator testing
+      print('Mock speech-to-text listening started for simulator testing');
+      
+      // Simulate real-time transcription updates during recording
+      Timer.periodic(const Duration(seconds: 2), (timer) {
+        if (!_isRecording) {
+          timer.cancel();
+          return;
+        }
+        
+        if (mounted) {
+          setState(() {
+            // Simulate partial transcription updates
+            final mockText = _mockTranscripts[_mockTranscriptIndex % _mockTranscripts.length];
+            final words = mockText.split(' ');
+            final partialLength = (_recordingSeconds / 2).clamp(1, words.length).toInt();
+            _currentTranscript = words.take(partialLength).join(' ');
+          });
+        }
       });
-    } else {
+      
+      _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (mounted) {
+          setState(() {
+            _recordingSeconds++;
+          });
+          print('Recording seconds: $_recordingSeconds');
+        }
+      });
+      
+    } catch (e) {
+      print('Error starting recording: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Recording failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    try {
+      final path = await _audioRecorder.stop();
+      
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _isTranscribing = true;
+        });
+      }
+      
       _recordingAnimationController.reverse();
       _pulseAnimationController.stop();
       _recordingTimer?.cancel();
-      setState(() {
-        _voiceNotes.add('Voice note ${_voiceNotes.length + 1}');
-        _recordingSeconds = 0;
-      });
+      
+      // COMMENTED OUT FOR iOS SIMULATOR TESTING
+      // Real speech-to-text stop
+      /*
+      // Stop speech-to-text
+      await _speechToText.stop();
+      */
+      
+      // Mock transcription processing
+      print('Mock transcription processing started');
+      
+      // Simulate transcription processing time
+      await Future.delayed(const Duration(seconds: 2));
+      
+      if (mounted) {
+        setState(() {
+          _isTranscribing = false;
+          if (path != null) {
+            // Use mock transcript data
+            final mockTranscript = _mockTranscripts[_mockTranscriptIndex % _mockTranscripts.length];
+            _mockTranscriptIndex++;
+            
+            _voiceNotes.add({
+              'audio': path,
+              'transcript': mockTranscript,
+              'duration': '0:${_recordingSeconds.toString().padLeft(2, '0')}',
+            });
+            
+            // Add mock transcribed text to the content field
+            final currentText = _contentController.text;
+            final newText = currentText.isEmpty 
+                ? mockTranscript 
+                : '$currentText\n\n$mockTranscript';
+            _contentController.text = newText;
+            
+            print('Mock transcript added: $mockTranscript');
+          }
+          _recordingSeconds = 0;
+          _currentTranscript = '';
+        });
+      }
+    } catch (e) {
+      print('Error stopping recording: $e');
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _isTranscribing = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to stop recording: $e')),
+        );
+      }
+    }
+  }
+  
+  Future<void> _playVoiceNote(String audioPath) async {
+    try {
+      if (_isPlaying && _currentPlayingPath == audioPath) {
+        await _audioPlayer.stop();
+        if (mounted) {
+          setState(() {
+            _currentPlayingPath = null;
+            _isPlaying = false;
+          });
+        }
+      } else {
+        await _audioPlayer.stop();
+        await _audioPlayer.play(DeviceFileSource(audioPath));
+        if (mounted) {
+          setState(() {
+            _currentPlayingPath = audioPath;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error playing audio: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to play audio: $e')),
+        );
+      }
     }
   }
   
@@ -205,41 +466,59 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
   List<Widget> _buildAttachmentsList() {
     List<Widget> widgets = [];
     
-    // Voice notes
+    // Voice notes with transcripts
     for (int i = 0; i < _voiceNotes.length; i++) {
+      final voiceNote = _voiceNotes[i];
       widgets.add(
         Container(
-          margin: const EdgeInsets.only(bottom: 4),
-          padding: const EdgeInsets.all(8),
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.blue[50],
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue[200]!),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.mic, size: 16, color: Colors.blue[600]),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  _voiceNotes[i],
-                  style: GoogleFonts.dmSans(
-                    fontSize: 12,
-                    color: Colors.blue[600],
-                    letterSpacing: 0,
+              Row(
+                children: [
+                  Icon(Icons.mic, size: 16, color: Colors.blue[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Voice Note ${i + 1} (${voiceNote['duration']})',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue[600],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _voiceNotes.removeAt(i);
-                  });
-                },
-                child: Icon(
-                  Icons.close,
-                  size: 16,
-                  color: Colors.grey[500],
-                ),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _voiceNotes.removeAt(i);
+                      });
+                    },
+                    child: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () async {
+                      await _playVoiceNote(voiceNote['audio']!);
+                    },
+                    child: Icon(
+                      _isPlaying && _currentPlayingPath == voiceNote['audio'] ? Icons.pause : Icons.play_arrow,
+                      size: 16,
+                      color: Colors.blue[600],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -299,6 +578,13 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.white,
+        shadowColor: Colors.transparent,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.white,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.black),
           onPressed: () => Navigator.pop(context),
@@ -396,36 +682,113 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
                 padding: const EdgeInsets.all(16),
                 child: widget.isViewMode && !_isEditMode
                     ? SingleChildScrollView(
-                        child: Text(
-                          _contentController.text.isEmpty ? 'No content' : _contentController.text,
-                          style: GoogleFonts.dmSans(
-                            fontSize: 16,
-                            color: _contentController.text.isEmpty ? Colors.grey[500] : Colors.black,
-                            letterSpacing: 0,
-                            height: 1.5,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _contentController.text.isEmpty ? 'No content' : _contentController.text,
+                              style: GoogleFonts.dmSans(
+                                fontSize: 16,
+                                color: _contentController.text.isEmpty ? Colors.grey[500] : Colors.black,
+                                letterSpacing: 0,
+                                height: 1.5,
+                              ),
+                            ),
+                            // Transcription indicator
+                            if (_isTranscribing) ...[
+                              const SizedBox(height: 16),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.orange[200]!),
+                                ),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange[600]!),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Transcribing...',
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.orange[700],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       )
-                    : TextField(
-                        controller: _contentController,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        style: GoogleFonts.dmSans(
-                          fontSize: 16,
-                          color: Colors.black,
-                          letterSpacing: 0,
-                          height: 1.5,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Start writing your note...',
-                          hintStyle: GoogleFonts.dmSans(
-                            fontSize: 16,
-                            color: Colors.grey[500],
-                            letterSpacing: -0.2,
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _contentController,
+                              maxLines: null,
+                              expands: true,
+                              textAlignVertical: TextAlignVertical.top,
+                              style: GoogleFonts.dmSans(
+                                fontSize: 16,
+                                color: Colors.black,
+                                letterSpacing: 0,
+                                height: 1.5,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Start writing your note...',
+                                hintStyle: GoogleFonts.dmSans(
+                                  fontSize: 16,
+                                  color: Colors.grey[500],
+                                  letterSpacing: -0.2,
+                                ),
+                                border: InputBorder.none,
+                              ),
+                            ),
                           ),
-                          border: InputBorder.none,
-                        ),
+                          // Transcription indicator for edit mode
+                          if (_isTranscribing) ...[
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.orange[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.orange[200]!),
+                              ),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.5,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    'Transcribing...',
+                                    style: GoogleFonts.dmSans(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.orange[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
               ),
             ),
@@ -505,6 +868,18 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
                                       letterSpacing: -0.2,
                                     ),
                                   ),
+                                  if (_isTranscribing)
+                                    const Padding(
+                                      padding: EdgeInsets.only(left: 8),
+                                      child: SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ),
                                 ],
                               ),
                             );
@@ -556,28 +931,7 @@ class _AddNoteScreenState extends State<AddNoteScreen> with TickerProviderStateM
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: [
-                        // Voice notes
-                        ...(_voiceNotes.map((note) => buildAttachmentCard(
-                          type: 'voice',
-                          name: note,
-                          onRemove: () {
-                            setState(() {
-                              _voiceNotes.remove(note);
-                            });
-                          },
-                        ))),
-                        // File attachments
-                        ...(_attachments.map((attachment) => buildAttachmentCard(
-                          type: 'file',
-                          name: attachment,
-                          onRemove: () {
-                            setState(() {
-                              _attachments.remove(attachment);
-                            });
-                          },
-                        ))),
-                      ],
+                      children: _buildAttachmentsList(),
                     ),
                   ],
                 ],

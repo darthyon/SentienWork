@@ -16,22 +16,38 @@ class OnboardingButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       height: 56,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: onPressed != null ? Colors.black : Colors.grey[400],
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-          ),
-          elevation: 0,
-          shadowColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: onPressed != null 
+              ? const LinearGradient(
+                  colors: [
+                    Color(0xFF3B82F6), // Lighter blue
+                    Color(0xFF1E3A8A), // Deep blue
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: onPressed == null ? Colors.grey[400] : null,
+          borderRadius: BorderRadius.circular(28),
         ),
-        child: Text(
-          text,
-          style: GoogleFonts.dmSans(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            elevation: 0,
+            shadowColor: Colors.transparent,
+          ),
+          child: Text(
+            text,
+            style: GoogleFonts.dmSans(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),

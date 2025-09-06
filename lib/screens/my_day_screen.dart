@@ -1,91 +1,44 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
 import '../models/task.dart';
 import '../widgets/ask_ben_button.dart';
 import 'add_task_screen.dart';
 import 'ben_meeting_suggestion_screen.dart';
 import 'ask_ben_screen.dart'; // Import AskBenScreen
+import '../utils/ben_avatar.dart'; // Import BenAvatar
+import '../services/user_service.dart';
 
 class MyDayScreen extends StatefulWidget {
-  const MyDayScreen({super.key});
+  final bool benTooltipDismissedThisSession;
+  final VoidCallback onBenTooltipDismissed;
+  
+  const MyDayScreen({
+    super.key,
+    required this.benTooltipDismissedThisSession,
+    required this.onBenTooltipDismissed,
+  });
 
   @override
   State<MyDayScreen> createState() => _MyDayScreenState();
 }
 
-class _MyDayScreenState extends State<MyDayScreen> {
-  bool _showBenTooltip = true;
+class _MyDayScreenState extends State<MyDayScreen> with TickerProviderStateMixin {
   DateTime _selectedDate = DateTime.now();
-  DateTime _currentWeekStart = _getWeekStart(DateTime.now());
-  Map<String, bool> _benSuggestions = {}; // Track Ben suggestions for tasks
+  DateTime _currentWeekStart = DateTime.now();
+  bool _showBenTooltip = true;
+  bool _isCreatingNewTask = false;
+  final TextEditingController _newTaskController = TextEditingController();
+  final FocusNode _newTaskFocusNode = FocusNode();
+  String _newTaskPriority = 'medium';
+  bool _hasShownInitialBenGreeting = false;
+  bool _shouldShowBenSuggestion = false;
+  
+  final UserService _userService = UserService();
   
   // Sample tasks data - will be replaced with proper data model
-  Map<String, List<Map<String, dynamic>>> _tasksByDate = {
-    DateTime.now().toIso8601String().split('T')[0]: [
-      {
-        'id': '1',
-        'title': 'Review quarterly goals',
-        'notes': 'Prepare for Q4 planning session',
-        'priority': 'high',
-        'timeOfDay': 'morning',
-        'date': DateTime.now().toIso8601String(),
-        'isCompleted': false,
-        'createdAt': DateTime.now().toIso8601String(),
-      },
-      {
-        'id': '2',
-        'title': 'Meeting with boss at 11am',
-        'notes': 'Quarterly review and goal setting',
-        'priority': 'high',
-        'timeOfDay': 'morning',
-        'date': DateTime.now().toIso8601String(),
-        'isCompleted': false,
-        'createdAt': DateTime.now().toIso8601String(),
-      },
-      {
-        'id': '3',
-        'title': 'Team standup meeting',
-        'notes': 'Daily sync with development team',
-        'priority': 'medium',
-        'timeOfDay': 'morning',
-        'date': DateTime.now().toIso8601String(),
-        'isCompleted': false,
-        'createdAt': DateTime.now().toIso8601String(),
-      },
-      {
-        'id': '4',
-        'title': 'Finish project proposal',
-        'notes': 'Complete final draft and review',
-        'priority': 'high',
-        'timeOfDay': 'afternoon',
-        'date': DateTime.now().toIso8601String(),
-        'isCompleted': false,
-        'createdAt': DateTime.now().toIso8601String(),
-      },
-      {
-        'id': '5',
-        'title': 'Call with client',
-        'notes': 'Discuss project timeline and requirements',
-        'priority': 'medium',
-        'timeOfDay': 'afternoon',
-        'date': DateTime.now().toIso8601String(),
-        'isCompleted': true,
-        'createdAt': DateTime.now().toIso8601String(),
-      },
-      {
-        'id': '6',
-        'title': 'Gym workout',
-        'notes': 'Cardio and strength training',
-        'priority': 'low',
-        'timeOfDay': 'evening',
-        'date': DateTime.now().toIso8601String(),
-        'isCompleted': false,
-        'createdAt': DateTime.now().toIso8601String(),
-      },
-    ],
-    DateTime.now().add(Duration(days: 1)).toIso8601String().split('T')[0]: [], // Tomorrow - empty
-  };
+  Map<String, List<Map<String, dynamic>>> _tasksByDate = {};
 
   static DateTime _getWeekStart(DateTime date) {
     // Get Sunday as start of week (weekday 7 = Sunday, 1 = Monday)
@@ -103,22 +56,26 @@ class _MyDayScreenState extends State<MyDayScreen> {
       final dateKey = _selectedDate.toIso8601String().split('T')[0];
       final tasks = _tasksByDate[dateKey] ?? [];
       final taskIndex = tasks.indexWhere((task) => task['id'] == taskId);
+      
       if (taskIndex != -1) {
         tasks[taskIndex]['isCompleted'] = !tasks[taskIndex]['isCompleted'];
         
         // Check if this is the boss meeting task and show Ben suggestion
         final task = tasks[taskIndex];
         if (task['title'] == 'Meeting with boss at 11am' && task['isCompleted'] == true) {
-          _benSuggestions[taskId] = true;
+          // Show Ben suggestion bottom sheet after a brief delay
+          Timer(const Duration(milliseconds: 500), () {
+            if (mounted) {
+              _showBenSuggestionBottomSheet();
+            }
+          });
         }
       }
     });
   }
 
   void _dismissBenSuggestion(String taskId) {
-    setState(() {
-      _benSuggestions[taskId] = false;
-    });
+    // Method kept for compatibility but no longer used
   }
 
   void _openBenSuggestion() async {
@@ -178,8 +135,332 @@ class _MyDayScreenState extends State<MyDayScreen> {
   }
 
   @override
+  void dispose() {
+    _newTaskController.dispose();
+    _newTaskFocusNode.dispose();
+    super.dispose();
+  }
+
+  void startCreatingNewTask() {
+    setState(() {
+      _isCreatingNewTask = true;
+    });
+    // Focus on the text field after the widget rebuilds
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _newTaskFocusNode.requestFocus();
+    });
+  }
+
+  void _saveNewTask() {
+    final title = _newTaskController.text.trim();
+    if (title.isNotEmpty) {
+      final newTask = {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'title': title,
+        'notes': '',
+        'priority': _newTaskPriority,
+        'timeOfDay': 'morning', // Default value, not used for grouping anymore
+        'date': _selectedDate.toIso8601String(),
+        'isCompleted': false,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+      
+      setState(() {
+        final dateKey = _selectedDate.toIso8601String().split('T')[0];
+        _tasksByDate[dateKey] ??= [];
+        _tasksByDate[dateKey]!.insert(0, newTask); // Add at top
+        _isCreatingNewTask = false;
+        _newTaskController.clear();
+      });
+    } else {
+      _cancelNewTask();
+    }
+  }
+
+  void _cancelNewTask() {
+    setState(() {
+      _isCreatingNewTask = false;
+      _newTaskController.clear();
+    });
+  }
+
+  String _getDefaultTimeOfDay() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    return 'evening';
+  }
+
+  int _getPriorityValue(String priority) {
+    switch (priority) {
+      case 'high': return 3;
+      case 'medium': return 2;
+      case 'low': return 1;
+      default: return 0;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _currentWeekStart = _getWeekStart(DateTime.now());
+    _initializeTasks();
+    
+    // Show Ben greeting bottom sheet after 2 seconds (once per session) - only for new users
+    if (!widget.benTooltipDismissedThisSession && !_userService.isPowerUser) {
+      Timer(const Duration(seconds: 2), () {
+        if (mounted && !_hasShownInitialBenGreeting) {
+          _showBenGreetingBottomSheet();
+        }
+      });
+    }
+  }
+
+  void _initializeTasks() {
+    final today = DateTime.now();
+    final todayKey = today.toIso8601String().split('T')[0];
+    
+    List<Map<String, dynamic>> todayTasks = [
+      {
+        'id': '1',
+        'title': 'Review quarterly reports',
+        'notes': '',
+        'priority': 'high',
+        'timeOfDay': 'morning',
+        'date': today.toIso8601String(),
+        'isCompleted': false,
+        'createdAt': today.subtract(const Duration(hours: 2)).toIso8601String(),
+      },
+      {
+        'id': '2',
+        'title': 'Update project timeline',
+        'notes': '',
+        'priority': 'medium',
+        'timeOfDay': 'afternoon',
+        'date': today.toIso8601String(),
+        'isCompleted': false,
+        'createdAt': today.subtract(const Duration(hours: 1)).toIso8601String(),
+      },
+      {
+        'id': '3',
+        'title': 'Call client about proposal',
+        'notes': '',
+        'priority': 'high',
+        'timeOfDay': 'morning',
+        'date': today.toIso8601String(),
+        'isCompleted': true,
+        'createdAt': today.subtract(const Duration(hours: 3)).toIso8601String(),
+      },
+    ];
+
+    // Only add boss meeting task for power users
+    if (_userService.isPowerUser) {
+      todayTasks.add({
+        'id': '4',
+        'title': 'Meeting with boss at 11am',
+        'notes': '',
+        'priority': 'high',
+        'timeOfDay': 'morning',
+        'date': today.toIso8601String(),
+        'isCompleted': false,
+        'createdAt': today.subtract(const Duration(hours: 4)).toIso8601String(),
+      });
+    }
+
+    _tasksByDate = {
+      todayKey: todayTasks,
+    };
+  }
+
+  void _showBenGreetingBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  const BenAvatar(
+                    size: 40,
+                    dotColor: Colors.white,
+                    isConversational: false,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'I\'ve generated some tasks for you. Tap one to get started!',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Action buttons
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        widget.onBenTooltipDismissed();
+                        setState(() {
+                          _hasShownInitialBenGreeting = true;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Got it!',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBenSuggestionBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  const BenAvatar(
+                    size: 40,
+                    dotColor: Colors.white,
+                    isConversational: false,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Can I suggest you something?',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Action buttons
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _openBenSuggestion();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        'Yes, please!',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      child: Text(
+                        'No, thanks!',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        toolbarHeight: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
+          statusBarColor: Colors.white,
+        ),
+      ),
       backgroundColor: const Color(0xFFF7F7F7),
       body: SafeArea(
         child: Column(
@@ -214,63 +495,6 @@ class _MyDayScreenState extends State<MyDayScreen> {
                     ),
                     
                     const SizedBox(height: 16),
-                    
-                    // Ben tooltip (sticky on first visit)
-                    if (_showBenTooltip)
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF7F7F7),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            // Ben avatar
-                            Container(
-                              width: 40,
-                              height: 40,
-                              decoration: const BoxDecoration(
-                                color: Colors.black,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.auto_awesome,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                            
-                            const SizedBox(width: 12),
-                            
-                            // Ben message
-                            Expanded(
-                              child: Text(
-                                'I\'ve organized your day. Tap any task to get started!',
-                                style: GoogleFonts.dmSans(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.normal,
-                                  color: Colors.black,
-                                  letterSpacing: 0,
-                                ),
-                              ),
-                            ),
-                            
-                            // Dismiss button
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _showBenTooltip = false;
-                                });
-                              },
-                              child: Icon(
-                                Icons.close,
-                                color: Colors.grey[600],
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -367,31 +591,7 @@ class _MyDayScreenState extends State<MyDayScreen> {
             
             // To-do list
             Expanded(
-              child: _tasks.isEmpty ? _buildEmptyState() : ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  // Morning section
-                  _buildSectionHeader('Morning'),
-                  const SizedBox(height: 12),
-                  ..._buildTasksForTimeOfDay('morning'),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Afternoon section
-                  _buildSectionHeader('Afternoon'),
-                  const SizedBox(height: 12),
-                  ..._buildTasksForTimeOfDay('afternoon'),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Evening section
-                  _buildSectionHeader('Evening'),
-                  const SizedBox(height: 12),
-                  ..._buildTasksForTimeOfDay('evening'),
-                  
-                  const SizedBox(height: 100), // Space for FAB
-                ],
-              ),
+              child: _tasks.isEmpty && !_isCreatingNewTask ? _buildEmptyState() : _buildTaskList(),
             ),
           ],
         ),
@@ -424,14 +624,14 @@ class _MyDayScreenState extends State<MyDayScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            isToday ? 'Great job finishing everything today!' : isTomorrow ? 'You have a clear schedule ahead.' : 'Enjoy your free time!',
+            isToday ? 'Great job finishing everything today!' : isToday ? 'You have a clear schedule ahead.' : 'Enjoy your free time!',
             style: GoogleFonts.dmSans(
               fontSize: 14,
               color: Colors.grey[500],
             ),
             textAlign: TextAlign.center,
           ),
-          if (isTomorrow && _hasIncompleteTasks()) ...[
+          if (isTomorrow && _hasIncompleteTasks() && !widget.benTooltipDismissedThisSession) ...[
             const SizedBox(height: 24),
             _buildBenTaskSuggestion(),
           ],
@@ -459,23 +659,15 @@ class _MyDayScreenState extends State<MyDayScreen> {
         children: [
           Row(
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: const BoxDecoration(
-                  color: Colors.black,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.auto_awesome,
-                  color: Colors.white,
-                  size: 16,
-                ),
+              // Ben avatar
+              const BenAvatar(
+                size: 32,
+                dotColor: Colors.white,
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'I\'ve organized your day. Tap any task to get started!',
+                  'Should I move your unfinished tasks to tomorrow?',
                   style: GoogleFonts.dmSans(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -569,36 +761,34 @@ class _MyDayScreenState extends State<MyDayScreen> {
     );
   }
   
-  List<Widget> _buildTasksForTimeOfDay(String timeOfDay) {
-    final tasksForTime = _tasks.where((task) => task['timeOfDay'] == timeOfDay).toList();
+  List<Widget> _buildAllTasks() {
+    // Sort tasks by priority (high first) then creation time (newest first)
+    final sortedTasks = List<Map<String, dynamic>>.from(_tasks);
+    sortedTasks.sort((a, b) {
+      // First sort by priority
+      final aPriority = _getPriorityValue(a['priority']);
+      final bPriority = _getPriorityValue(b['priority']);
+      
+      if (aPriority != bPriority) {
+        return bPriority.compareTo(aPriority); // Higher priority first
+      }
+      
+      // If same priority, sort by creation time (newest first)
+      final aTime = DateTime.parse(a['createdAt']);
+      final bTime = DateTime.parse(b['createdAt']);
+      return bTime.compareTo(aTime);
+    });
     
-    return tasksForTime.map((task) {
+    return sortedTasks.map((task) {
       return Column(
         children: [
           _buildTodoCard(task),
-          // Show Ben suggestion card if applicable
-          if (_benSuggestions[task['id']] == true) ...[
-            const SizedBox(height: 8),
-            _buildBenSuggestionCard(task['id']),
-          ],
           const SizedBox(height: 12),
         ],
       );
     }).toList();
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: GoogleFonts.dmSans(
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        color: Colors.grey[700],
-        letterSpacing: 0,
-      ),
-    );
-  }
-  
   Widget _buildTodoCard(Map<String, dynamic> task) {
     final String title = task['title'];
     final String priority = task['priority'];
@@ -620,86 +810,87 @@ class _MyDayScreenState extends State<MyDayScreen> {
         priorityColor = Colors.grey;
     }
     
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          // Priority stripe
-          Container(
-            width: 4,
-            height: 60,
-            decoration: BoxDecoration(
-              color: priorityColor,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
+    return GestureDetector(
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AddTaskScreen(
+              task: Task.fromMap(task),
+              isViewMode: false, // Always open in edit mode
             ),
           ),
-          
-          // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Checkbox
-                  GestureDetector(
-                    onTap: () {
-                      _toggleTaskCompletion(taskId);
-                    },
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: isCompleted ? Colors.black : Colors.transparent,
-                        border: Border.all(
-                          color: isCompleted ? Colors.black : Colors.grey[400]!,
-                          width: 2,
-                        ),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: isCompleted
-                          ? const Icon(
-                              Icons.check,
-                              color: Colors.white,
-                              size: 16,
-                            )
-                          : null,
-                    ),
-                  ),
-                  
-                  const SizedBox(width: 12),
-                  
-                  // Task title
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () async {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddTaskScreen(
-                              task: Task.fromMap(task),
-                              isViewMode: true,
-                            ),
-                          ),
-                        );
-                        if (result != null) {
-                          setState(() {
-                            final dateKey = _selectedDate.toIso8601String().split('T')[0];
-                            final tasks = _tasksByDate[dateKey] ?? [];
-                            final index = tasks.indexOf(task);
-                            if (result == 'deleted') {
-                              tasks.removeAt(index);
-                            } else if (result is Task) {
-                              tasks[index] = result.toMap();
-                            }
-                          });
-                        }
+        );
+        if (result != null) {
+          setState(() {
+            final dateKey = _selectedDate.toIso8601String().split('T')[0];
+            final tasks = _tasksByDate[dateKey] ?? [];
+            final index = tasks.indexOf(task);
+            if (result == 'deleted') {
+              tasks.removeAt(index);
+            } else if (result is Task) {
+              tasks[index] = result.toMap();
+            }
+          });
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            // Priority stripe
+            Container(
+              width: 4,
+              height: 60,
+              decoration: BoxDecoration(
+                color: priorityColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+            ),
+            
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Checkbox
+                    GestureDetector(
+                      onTap: () {
+                        _toggleTaskCompletion(taskId);
                       },
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: isCompleted ? Colors.black : Colors.transparent,
+                          border: Border.all(
+                            color: isCompleted ? Colors.black : Colors.grey[400]!,
+                            width: 2,
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: isCompleted
+                            ? const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 16,
+                              )
+                            : null,
+                      ),
+                    ),
+                    
+                    const SizedBox(width: 12),
+                    
+                    // Task title
+                    Expanded(
                       child: Text(
                         title,
                         style: GoogleFonts.dmSans(
@@ -711,78 +902,144 @@ class _MyDayScreenState extends State<MyDayScreen> {
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildBenSuggestionCard(String taskId) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOutBack,
-      margin: const EdgeInsets.only(left: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F7F7),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+  Widget _buildInlineTaskCard() {
+    return GestureDetector(
+      onTap: () {
+        // Prevent dismissing when tapping on the card itself
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          onTap: _openBenSuggestion,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Ben avatar
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: Colors.black,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.auto_awesome,
-                    color: Colors.white,
-                    size: 16,
-                  ),
+          border: Border.all(color: Colors.blue, width: 2),
+        ),
+        child: Row(
+          children: [
+            // Priority stripe (default medium priority)
+            Container(
+              width: 4,
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.grey[600],
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
                 ),
-                
-                const SizedBox(width: 12),
-                
-                // Message
-                Expanded(
-                  child: Text(
-                    'Can I suggest you something?',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ),
-                
-                // Dismiss button
-                GestureDetector(
-                  onTap: () => _dismissBenSuggestion(taskId),
-                  child: Icon(
-                    Icons.close,
-                    color: Colors.grey[600],
-                    size: 18,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // Checkbox (unchecked for new task)
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        border: Border.all(
+                          color: Colors.grey[400]!,
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    
+                    const SizedBox(width: 12),
+                    
+                    // Editable text field
+                    Expanded(
+                      child: TextField(
+                        controller: _newTaskController,
+                        focusNode: _newTaskFocusNode,
+                        decoration: const InputDecoration(
+                          hintText: 'Task title...',
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: GoogleFonts.dmSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                          letterSpacing: 0,
+                        ),
+                        onSubmitted: (_) => _saveNewTask(),
+                        onTapOutside: (_) => _saveNewTask(),
+                        textInputAction: TextInputAction.done,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTaskList() {
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: _tasks.length + (_isCreatingNewTask ? 1 : 0),
+      itemBuilder: (context, index) {
+        // Handle inline new task creation at the top
+        if (_isCreatingNewTask && index == 0) {
+          return KeyedSubtree(
+            key: const Key('new_task'),
+            child: Column(
+              children: [
+                _buildInlineTaskCard(),
+                const SizedBox(height: 12),
+              ],
+            ),
+          );
+        }
+        
+        // Adjust index for existing tasks when new task is being created
+        final taskIndex = _isCreatingNewTask ? index - 1 : index;
+        final task = _tasks[taskIndex];
+        
+        return KeyedSubtree(
+          key: Key(task['id']),
+          child: Column(
+            children: [
+              _buildTodoCard(task),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+      onReorder: (int oldIndex, int newIndex) {
+        // Don't allow reordering if we're creating a new task
+        if (_isCreatingNewTask) return;
+        
+        setState(() {
+          if (oldIndex < newIndex) {
+            newIndex -= 1;
+          }
+          final task = _tasks.removeAt(oldIndex);
+          _tasks.insert(newIndex, task);
+          
+          // Update the tasksByDate map
+          final dateKey = _selectedDate.toIso8601String().split('T')[0];
+          _tasksByDate[dateKey] = _tasks;
+        });
+      },
     );
   }
 }
@@ -806,10 +1063,12 @@ class _TaskMoveModalState extends State<_TaskMoveModal> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1042,10 +1301,12 @@ class _MonthlyCalendarModalState extends State<_MonthlyCalendarModal> {
     final days = _getDaysInMonth(_currentMonth);
     
     return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

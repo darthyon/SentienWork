@@ -1,8 +1,14 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/ask_ben_button.dart';
-import 'ben_weekly_report_screen.dart';
 import 'settings_screen.dart';
+import 'anonymous_coaching_screen.dart';
+import 'my_performance_screen.dart';
+import 'ben_weekly_report_screen.dart';
+import '../utils/ben_avatar.dart';
+import '../services/user_service.dart';
 
 class MyJourneyScreen extends StatefulWidget {
   const MyJourneyScreen({super.key});
@@ -14,30 +20,61 @@ class MyJourneyScreen extends StatefulWidget {
 class _MyJourneyScreenState extends State<MyJourneyScreen> {
   String _aspiration = "You're working toward becoming a product manager within the next 18 months. Let's focus on leadership skills and visibility.";
   
+  final UserService _userService = UserService();
+  
+  // User type based on email - in real app this would come from auth/user service
+  String get _userEmail => _userService.userEmail;
+  
+  bool get _isNewUser => _userService.isNewUser;
+  bool get _isPowerUser => _userService.isPowerUser;
+  
+  int get _currentStreak => _userService.currentStreak;
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        toolbarHeight: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
+          statusBarColor: Colors.white,
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            // Header
+            // Header + Profile Section with White Background
             Container(
-              padding: const EdgeInsets.all(20),
               color: Colors.white,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Text(
-                    'My Journey',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                      letterSpacing: -0.5,
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'My Journey',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        AskBenButton(),
+                      ],
                     ),
                   ),
-                  const AskBenButton(),
+                  
+                  // Profile Section
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                    child: _buildProfileSection(),
+                  ),
                 ],
               ),
             ),
@@ -45,15 +82,10 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
             // Scrollable Content
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. Profile + Settings Cluster
-                    _buildProfileSection(),
-                    
-                    const SizedBox(height: 24),
-                    
                     // 2. Aspiration Card
                     _buildAspirationCard(),
                     
@@ -64,17 +96,27 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
                     
                     const SizedBox(height: 24),
                     
-                    // 4. Weekly Report Section
+                    // 4. My Performance Card
+                    _buildMyPerformanceCard(),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // 5. Live Anonymous Coaching Card
+                    _buildCoachingCard(),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // 6. Weekly Report Section
                     _buildWeeklyReportSection(),
                     
                     const SizedBox(height: 24),
                     
-                    // 5. Milestones Section
+                    // 7. Milestones Section
                     _buildMilestonesSection(),
                     
                     const SizedBox(height: 24),
                     
-                    // 6. Assessments Section
+                    // 8. Assessments Section
                     _buildAssessmentsSection(),
                     
                     const SizedBox(height: 40),
@@ -215,7 +257,7 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
   Widget _buildStatsRow() {
     return Row(
       children: [
-        Expanded(child: _buildStatCard('7', 'Day Streak', Icons.local_fire_department, Colors.grey[600]!)),
+        Expanded(child: _buildStatCard('$_currentStreak', 'Day Streak', Icons.local_fire_department, Colors.grey[600]!)),
         const SizedBox(width: 12),
         Expanded(child: _buildStatCard('24', 'Tasks Done', Icons.check_circle, Colors.green)),
         const SizedBox(width: 12),
@@ -266,6 +308,88 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+  
+  Widget _buildMyPerformanceCard() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MyPerformanceScreen(),
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF1E3A8A), // Deep blue
+              Color(0xFF3B82F6), // Lighter blue
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.analytics,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'My Performance',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Track your progress and stay on top of your goals',
+                    style: GoogleFonts.dmSans(
+                      fontSize: 14,
+                      color: Colors.white.withOpacity(0.8),
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              color: Colors.white.withOpacity(0.7),
+              size: 16,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -339,7 +463,7 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const BenWeeklyReportScreen(),
+                        builder: (context) => BenWeeklyReportScreen(),
                       ),
                     );
                   },
@@ -351,7 +475,7 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
                     ),
                   ),
                   child: Text(
-                    'View Ben\'s Full Report',
+                    'View Interactive Report',
                     style: GoogleFonts.dmSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -468,19 +592,153 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        _buildAssessmentCard('DASS-21', 'Depression, Anxiety & Stress Scale'),
-        const SizedBox(height: 12),
-        _buildAssessmentCard('MBTI', 'Myers-Briggs Type Indicator'),
-        const SizedBox(height: 12),
-        _buildAssessmentCard('Color Personality', 'Personality Color Test'),
+        _isNewUser 
+          ? _buildLockedAssessmentsContainer()
+          : Column(
+              children: [
+                _buildAssessmentCard('MBTI', 'Myers-Briggs Type Indicator'),
+                const SizedBox(height: 12),
+                _buildAssessmentCard('Color Personality', 'Personality Color Test'),
+              ],
+            ),
       ],
+    );
+  }
+  
+  Widget _buildLockedAssessmentsContainer() {
+    return GestureDetector(
+      onTap: () => _showUnlockModal(),
+      child: Stack(
+        children: [
+          // Combined assessments container
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // MBTI Assessment
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'MBTI',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Myers-Briggs Type Indicator',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Color Personality Assessment
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Color Personality',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Personality Color Test',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Glass blur overlay
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.lock,
+                          color: Colors.grey[700],
+                          size: 24,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Unlock feature',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
   
   Widget _buildAssessmentCard(String title, String subtitle) {
     return GestureDetector(
       onTap: () {
-        _showAssessmentDetail(title);
+        if (_isNewUser) {
+          _showUnlockModal();
+        } else {
+          _showAssessmentDetail(title);
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -495,44 +753,173 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
             ),
           ],
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.dmSans(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                      letterSpacing: 0,
+        child: _isNewUser 
+          ? Stack(
+              children: [
+                // Original content
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
+                              letterSpacing: 0,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                              letterSpacing: 0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                // Glass blur overlay
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Unlock feature',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.dmSans(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      letterSpacing: 0,
-                    ),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          letterSpacing: 0,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.grey[400],
+                  size: 16,
+                ),
+              ],
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey[400],
-            ),
-          ],
-        ),
       ),
     );
   }
   
+  void _showUnlockModal() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.lock,
+                  size: 48,
+                  color: Colors.grey[600],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Content Locked',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Unlock after your 7th streak',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Got it',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showAspirationModal() {
     final TextEditingController controller = TextEditingController(text: _aspiration);
     
@@ -691,6 +1078,176 @@ class _MyJourneyScreenState extends State<MyJourneyScreen> {
       ),
     );
   }
+
+  Widget _buildCoachingCard() {
+    return GestureDetector(
+      onTap: () {
+        if (_isNewUser) {
+          _showUnlockModal();
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AnonymousCoachingScreen(),
+            ),
+          );
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.black,
+              Color(0xFF424242),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 15,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: _isNewUser 
+          ? Stack(
+              children: [
+                // Original content
+                Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.psychology,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Meet your coach',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Get anonymous help from experts in the field',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.8),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                // Glass blur overlay
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 2.0, sigmaY: 2.0),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.lock,
+                                color: Colors.white.withOpacity(0.9),
+                                size: 24,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Unlock feature',
+                                style: GoogleFonts.dmSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withOpacity(0.9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.psychology,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Meet your coach',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Get anonymous help from experts in the field',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 14,
+                          color: Colors.white.withOpacity(0.8),
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.white.withOpacity(0.7),
+                  size: 16,
+                ),
+              ],
+            ),
+      ),
+    );
+  }
 }
 
 class AssessmentDetailScreen extends StatelessWidget {
@@ -705,6 +1262,13 @@ class AssessmentDetailScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
+        surfaceTintColor: Colors.white,
+        shadowColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.white,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
@@ -760,8 +1324,6 @@ class AssessmentDetailScreen extends StatelessWidget {
   
   String _getAssessmentContent(String type) {
     switch (type) {
-      case 'DASS-21':
-        return 'Your DASS-21 results show normal levels across all scales. This assessment measures depression, anxiety, and stress levels.';
       case 'MBTI':
         return 'Your personality type is ENFJ - The Protagonist. You are charismatic and inspiring leaders, able to mesmerize listeners.';
       case 'Color Personality':

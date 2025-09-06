@@ -18,6 +18,7 @@ class PermissionsScreen extends StatefulWidget {
 }
 
 class _PermissionsScreenState extends State<PermissionsScreen> {
+  bool _microphoneEnabled = false;
   bool _calendarEnabled = false;
   bool _emailEnabled = false;
   bool _linkedinEnabled = false;
@@ -62,7 +63,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                   Text(
                     'Connect your tools.',
                     style: GoogleFonts.dmSans(
-                      fontSize: 34,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.black,
                       height: 1.2,
@@ -88,8 +89,21 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               
               // Toggle Rows
               PermissionToggle(
+                title: 'Microphone Access',
+                subtitle: 'Record voice notes and get speech-to-text transcription.',
+                value: _microphoneEnabled,
+                onChanged: (value) {
+                  setState(() {
+                    _microphoneEnabled = value;
+                  });
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              PermissionToggle(
                 title: 'Calendar Integration',
-                subtitle: 'Sync your tasks with events.',
+                subtitle: 'Sync your schedule to suggest better meeting times.',
                 value: _calendarEnabled,
                 onChanged: (value) {
                   setState(() {
@@ -102,7 +116,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               
               PermissionToggle(
                 title: 'Email Integration',
-                subtitle: 'Stay on top of follow-ups.',
+                subtitle: 'Track important emails and remind you of follow-ups.',
                 value: _emailEnabled,
                 onChanged: (value) {
                   setState(() {
@@ -115,7 +129,7 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
               
               PermissionToggle(
                 title: 'LinkedIn Integration',
-                subtitle: 'Track career progress and opportunities.',
+                subtitle: 'Monitor your professional network and career opportunities.',
                 value: _linkedinEnabled,
                 onChanged: (value) {
                   setState(() {

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../utils/ben_avatar.dart';
 
 class AskBenScreen extends StatefulWidget {
   const AskBenScreen({super.key});
@@ -262,21 +263,13 @@ class _AskBenScreenState extends State<AskBenScreen>
                     const Spacer(flex: 2),
                     
                     // Ben avatar
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome,
-                        color: Colors.white,
-                        size: 32,
-                      ),
+                    const BenAvatar(
+                      size: 64,
+                      dotColor: Colors.white,
+                      isConversational: true,
                     ),
                     
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 24),
                     
                     // Question content
                     SizedBox(
@@ -305,7 +298,7 @@ class _AskBenScreenState extends State<AskBenScreen>
                     
                     // Day rating selection (step 0)
                     if (_currentStep == 0 && _selectedDayRating == null && _showOptions) ...[
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 16),
                       FadeTransition(
                         opacity: _optionsAnimation,
                         child: Column(
@@ -342,7 +335,7 @@ class _AskBenScreenState extends State<AskBenScreen>
                     
                     // Mood selection (step 2)
                     if (_currentStep == 2 && _selectedMood == null && _showOptions) ...[
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       FadeTransition(
                         opacity: _optionsAnimation,
                         child: Row(

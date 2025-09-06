@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:math' as math;
+import '../utils/ben_avatar.dart';
 
 class BenWeeklyReportScreen extends StatefulWidget {
   const BenWeeklyReportScreen({super.key});
@@ -39,40 +41,15 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
     {
       'message': 'You completed 8 out of 10 tasks this week. The completed ones included project planning, stakeholder updates, and team coordination.',
       'hasOptions': true,
-      'options': ['Good progress', 'What about the incomplete ones?']
+      'options': ['Good progress', 'Show my performance']
     },
     {
-      'message': 'Your mood has been consistently positive this week, with an average rating of 4.2/5. You had one challenging day on Wednesday but bounced back quickly.',
-      'hasOptions': true,
-      'options': ['That sounds right', 'Tell me about Wednesday']
+      'message': 'Here\'s how your performance has evolved. I\'ve compared your current skills with last month.',
+      'hasOptions': false,
+      'showSpiderChart': true
     },
     {
-      'message': 'On Wednesday, you logged feeling 😞 Sad after your boss meeting. I noticed this coincided with the quarterly review discussion. Would you like some tips for handling similar situations?',
-      'hasOptions': true,
-      'options': ['Yes, help me improve', 'What else happened?']
-    },
-    {
-      'message': 'Here are some strategies:\n\n• Before tough meetings, prepare 3 key wins to share\n• During the meeting, ask clarifying questions instead of assuming criticism\n• After, reflect on actionable feedback rather than dwelling on negatives',
-      'hasOptions': true,
-      'options': ['That\'s helpful', 'Continue with report']
-    },
-    {
-      'message': 'Key highlights: You earned 2 new badges for "Team Collaboration" and "Goal Achievement". You also maintained your 7-day streak!',
-      'hasOptions': true,
-      'options': ['Awesome!', 'What\'s next?']
-    },
-    {
-      'message': 'Now, let\'s see how you\'re progressing toward your aspiration of becoming a product manager.',
-      'hasOptions': true,
-      'options': ['Show me', 'I\'m curious']
-    },
-    {
-      'message': 'Based on your activities, you\'re 68% of the way to your leadership milestone and 45% toward product management basics. You\'re on track!',
-      'hasOptions': true,
-      'options': ['That\'s great news', 'How can I improve?']
-    },
-    {
-      'message': 'Would you like me to generate a PDF summary of this report for your records?',
+      'message': 'Do you want a generated PDF of this report?',
       'hasOptions': true,
       'options': ['Yes, please', 'No, thanks']
     }
@@ -137,10 +114,62 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
           
           Timer(const Duration(milliseconds: 1500), () {
             if (mounted) {
-              setState(() {
-                _showOptions = true;
-              });
-              _optionsController.forward();
+              final currentStepData = _reportSteps[_currentStep];
+              if (currentStepData['hasOptions'] == true) {
+                setState(() {
+                  _showOptions = true;
+                });
+                _optionsController.forward();
+              } else if (currentStepData['showSpiderChart'] == true) {
+                // Show spider chart, then auto-advance after delay
+                Timer(const Duration(milliseconds: 3000), () {
+                  if (mounted) {
+                    _nextStep();
+                  }
+                });
+              }
+            }
+          });
+        } else {
+          // End of report
+          _showCompletionMessage();
+        }
+      }
+    });
+  }
+
+  void _nextStep() {
+    setState(() {
+      _showOptions = false;
+    });
+    _optionsController.reset();
+    
+    Timer(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        if (_currentStep < _reportSteps.length - 1) {
+          setState(() {
+            _currentStep++;
+            _currentMessage = _reportSteps[_currentStep]['message'];
+          });
+          _fadeController.reset();
+          _fadeController.forward();
+          
+          Timer(const Duration(milliseconds: 1500), () {
+            if (mounted) {
+              final currentStepData = _reportSteps[_currentStep];
+              if (currentStepData['hasOptions'] == true) {
+                setState(() {
+                  _showOptions = true;
+                });
+                _optionsController.forward();
+              } else if (currentStepData['showSpiderChart'] == true) {
+                // Show spider chart, then auto-advance after delay
+                Timer(const Duration(milliseconds: 3000), () {
+                  if (mounted) {
+                    _nextStep();
+                  }
+                });
+              }
             }
           });
         } else {
@@ -183,7 +212,7 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
   void _skipToSummary() {
     setState(() {
       _showOptions = false;
-      _currentStep = _reportSteps.length - 2; // Go to progress comparison
+      _currentStep = _reportSteps.length - 3; // Go to performance comparison
       _currentMessage = _reportSteps[_currentStep]['message'];
     });
     _optionsController.reset();
@@ -192,10 +221,12 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
     
     Timer(const Duration(milliseconds: 1500), () {
       if (mounted) {
-        setState(() {
-          _showOptions = true;
+        // Show spider chart, then auto-advance
+        Timer(const Duration(milliseconds: 3000), () {
+          if (mounted) {
+            _nextStep();
+          }
         });
-        _optionsController.forward();
       }
     });
   }
@@ -223,8 +254,8 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
   void _skipMoodAdvice() {
     setState(() {
       _showOptions = false;
-      _currentStep = 7; // Skip mood advice, go to highlights
-      _currentMessage = _reportSteps[7]['message'];
+      _currentStep = 4; // Go to performance comparison
+      _currentMessage = _reportSteps[4]['message'];
     });
     _optionsController.reset();
     _fadeController.reset();
@@ -232,10 +263,12 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
     
     Timer(const Duration(milliseconds: 1500), () {
       if (mounted) {
-        setState(() {
-          _showOptions = true;
+        // Show spider chart, then auto-advance
+        Timer(const Duration(milliseconds: 3000), () {
+          if (mounted) {
+            _nextStep();
+          }
         });
-        _optionsController.forward();
       }
     });
   }
@@ -271,21 +304,13 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
                     const Spacer(flex: 1),
                     
                     // Ben avatar
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome,
-                        color: Colors.white,
-                        size: 32,
-                      ),
+                    const BenAvatar(
+                      size: 64,
+                      dotColor: Colors.white,
+                      isConversational: true,
                     ),
                     
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 24),
                     
                     // Report content
                     Flexible(
@@ -308,6 +333,17 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
                                       letterSpacing: -0.3,
                                     ),
                                     textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              
+                              // Show spider chart when needed
+                              if (_currentStep < _reportSteps.length && _reportSteps[_currentStep]['showSpiderChart'] == true)
+                                Container(
+                                  margin: const EdgeInsets.only(top: 32),
+                                  height: 300,
+                                  child: CustomPaint(
+                                    painter: ComparisonSpiderWebPainter(),
+                                    size: const Size(300, 300),
                                   ),
                                 ),
                             ],
@@ -392,4 +428,184 @@ class _BenWeeklyReportScreenState extends State<BenWeeklyReportScreen>
     _optionsController.dispose();
     super.dispose();
   }
+}
+
+class PillarData {
+  final String name;
+  final double value;
+  
+  PillarData(this.name, this.value);
+}
+
+class ComparisonSpiderWebPainter extends CustomPainter {
+  ComparisonSpiderWebPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = math.min(size.width, size.height) / 2 - 40;
+    
+    // Sample data for previous and current performance
+    final previousPillars = [
+      PillarData('Leadership', 65),
+      PillarData('Communication', 70),
+      PillarData('Problem Solving', 60),
+      PillarData('Time Management', 55),
+      PillarData('Collaboration', 75),
+    ];
+    
+    final currentPillars = [
+      PillarData('Leadership', 80),
+      PillarData('Communication', 75),
+      PillarData('Problem Solving', 85),
+      PillarData('Time Management', 70),
+      PillarData('Collaboration', 70),
+    ];
+    
+    final webPaint = Paint()
+      ..color = Colors.grey[300]!
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+
+    // Draw web circles
+    for (int i = 1; i <= 5; i++) {
+      canvas.drawCircle(center, radius * i / 5, webPaint);
+    }
+
+    // Draw web lines
+    final angleStep = 2 * math.pi / previousPillars.length;
+    for (int i = 0; i < previousPillars.length; i++) {
+      final angle = i * angleStep - math.pi / 2;
+      final endPoint = Offset(
+        center.dx + radius * math.cos(angle),
+        center.dy + radius * math.sin(angle),
+      );
+      canvas.drawLine(center, endPoint, webPaint);
+    }
+
+    // Draw previous performance (solid black line)
+    final previousPath = Path();
+    final previousPoints = <Offset>[];
+    
+    for (int i = 0; i < previousPillars.length; i++) {
+      final angle = i * angleStep - math.pi / 2;
+      final value = previousPillars[i].value / 100;
+      final point = Offset(
+        center.dx + radius * value * math.cos(angle),
+        center.dy + radius * value * math.sin(angle),
+      );
+      previousPoints.add(point);
+      
+      if (i == 0) {
+        previousPath.moveTo(point.dx, point.dy);
+      } else {
+        previousPath.lineTo(point.dx, point.dy);
+      }
+    }
+    previousPath.close();
+
+    final previousStrokePaint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawPath(previousPath, previousStrokePaint);
+
+    // Draw current performance (dotted colored lines)
+    for (int i = 0; i < currentPillars.length; i++) {
+      final angle = i * angleStep - math.pi / 2;
+      final currentValue = currentPillars[i].value / 100;
+      final previousValue = previousPillars[i].value / 100;
+      
+      final currentPoint = Offset(
+        center.dx + radius * currentValue * math.cos(angle),
+        center.dy + radius * currentValue * math.sin(angle),
+      );
+      
+      final previousPoint = Offset(
+        center.dx + radius * previousValue * math.cos(angle),
+        center.dy + radius * previousValue * math.sin(angle),
+      );
+      
+      // Determine color based on improvement or decline
+      final isImprovement = currentValue > previousValue;
+      final lineColor = isImprovement ? Colors.blue : Colors.red;
+      
+      final dottedPaint = Paint()
+        ..color = lineColor
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke;
+      
+      // Draw dotted line from previous to current point
+      _drawDottedLine(canvas, previousPoint, currentPoint, dottedPaint);
+      
+      // Draw current point
+      final pointPaint = Paint()
+        ..color = lineColor
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(currentPoint, 4, pointPaint);
+    }
+
+    // Draw previous performance points
+    final previousPointPaint = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.fill;
+
+    for (final point in previousPoints) {
+      canvas.drawCircle(point, 4, previousPointPaint);
+    }
+
+    // Draw labels
+    final textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+    );
+
+    for (int i = 0; i < previousPillars.length; i++) {
+      final angle = i * angleStep - math.pi / 2;
+      final labelRadius = radius + 20;
+      final labelPoint = Offset(
+        center.dx + labelRadius * math.cos(angle),
+        center.dy + labelRadius * math.sin(angle),
+      );
+
+      textPainter.text = TextSpan(
+        text: previousPillars[i].name,
+        style: GoogleFonts.dmSans(
+          fontSize: 12,
+          color: Colors.black,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+      textPainter.layout();
+
+      final textOffset = Offset(
+        labelPoint.dx - textPainter.width / 2,
+        labelPoint.dy - textPainter.height / 2,
+      );
+      textPainter.paint(canvas, textOffset);
+    }
+  }
+
+  void _drawDottedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    const dashWidth = 5.0;
+    const dashSpace = 3.0;
+    
+    final distance = (end - start).distance;
+    final dashCount = (distance / (dashWidth + dashSpace)).floor();
+    
+    for (int i = 0; i < dashCount; i++) {
+      final startRatio = i * (dashWidth + dashSpace) / distance;
+      final endRatio = (i * (dashWidth + dashSpace) + dashWidth) / distance;
+      
+      if (endRatio > 1.0) break;
+      
+      final dashStart = Offset.lerp(start, end, startRatio)!;
+      final dashEnd = Offset.lerp(start, end, endRatio)!;
+      
+      canvas.drawLine(dashStart, dashEnd, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

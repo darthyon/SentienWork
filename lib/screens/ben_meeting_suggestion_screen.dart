@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'add_task_screen.dart';
 import '../models/task.dart';
+import '../utils/ben_avatar.dart';
 
 class BenMeetingSuggestionScreen extends StatefulWidget {
   const BenMeetingSuggestionScreen({super.key});
@@ -27,15 +29,13 @@ class _BenMeetingSuggestionScreenState extends State<BenMeetingSuggestionScreen>
 
   final List<String> _conversationSteps = [
     "I noticed you just finished your meeting with your boss. How did it go?",
-    "Based on typical boss meetings, I have some action item suggestions for you:",
+    "Based on the context of your meeting, I have some action item suggestions for you:",
   ];
 
   final List<String> _actionItemSuggestions = [
     "Follow up on quarterly goals discussion",
     "Prepare project status update for next week",
     "Schedule team meeting to discuss new initiatives",
-    "Review and update current project timeline",
-    "Send meeting summary to relevant stakeholders",
   ];
 
   @override
@@ -145,6 +145,18 @@ class _BenMeetingSuggestionScreenState extends State<BenMeetingSuggestionScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFFAFAFA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFAFAFA),
+        elevation: 0,
+        surfaceTintColor: const Color(0xFFFAFAFA),
+        shadowColor: Colors.transparent,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.white,
+          statusBarIconBrightness: Brightness.dark,
+          statusBarBrightness: Brightness.light,
+        ),
+        toolbarHeight: 0, // Hide the AppBar but keep status bar styling
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -169,28 +181,20 @@ class _BenMeetingSuggestionScreenState extends State<BenMeetingSuggestionScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Column(
                   children: [
-                    const Spacer(flex: 1),
+                    const SizedBox(height: 20),
                     
-                    // Ben avatar
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.auto_awesome,
-                        color: Colors.white,
-                        size: 32,
-                      ),
+                    // Ben avatar - moved higher up
+                    const BenAvatar(
+                      size: 64,
+                      dotColor: Colors.white,
+                      isConversational: true,
                     ),
                     
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 24),
                     
-                    // Question content
+                    // Question content - reduced height
                     SizedBox(
-                      height: 120,
+                      height: 80,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -200,7 +204,7 @@ class _BenMeetingSuggestionScreenState extends State<BenMeetingSuggestionScreen>
                               child: Text(
                                 _currentQuestion!,
                                 style: GoogleFonts.dmSans(
-                                  fontSize: 22,
+                                  fontSize: 20,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.black,
                                   height: 1.3,
@@ -277,104 +281,100 @@ class _BenMeetingSuggestionScreenState extends State<BenMeetingSuggestionScreen>
                     
                     // Action item suggestions (step 1)
                     if (_currentStep == 1 && _showSuggestions && _showOptions) ...[
-                      const SizedBox(height: 24),
-                      Text(
-                        'Select the action items you\'d like me to add to your tasks:',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 16,
-                          color: Colors.grey[700],
-                          letterSpacing: -0.2,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       Expanded(
                         child: FadeTransition(
                           opacity: _optionsAnimation,
-                          child: ListView.builder(
-                            itemCount: _suggestedActionItems.length,
-                            itemBuilder: (context, index) {
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: GestureDetector(
-                                  onTap: () => _toggleActionItem(index),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: _selectedItems[index] ? Colors.black.withOpacity(0.05) : Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: _selectedItems[index] ? Colors.black : Colors.grey[300]!,
-                                        width: _selectedItems[index] ? 2 : 1,
+                          child: Column(
+                            children: [
+                              // Action items list (fixed height to prevent scrolling)
+                              ...List.generate(_suggestedActionItems.length, (index) {
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  child: GestureDetector(
+                                    onTap: () => _toggleActionItem(index),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: _selectedItems[index] ? Colors.black.withOpacity(0.05) : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: _selectedItems[index] ? Colors.black : Colors.grey[300]!,
+                                          width: _selectedItems[index] ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 20,
+                                            height: 20,
+                                            decoration: BoxDecoration(
+                                              color: _selectedItems[index] ? Colors.black : Colors.transparent,
+                                              borderRadius: BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: _selectedItems[index] ? Colors.black : Colors.grey[400]!,
+                                                width: 2,
+                                              ),
+                                            ),
+                                            child: _selectedItems[index]
+                                                ? const Icon(
+                                                    Icons.check,
+                                                    color: Colors.white,
+                                                    size: 14,
+                                                  )
+                                                : null,
+                                          ),
+                                          const SizedBox(width: 16),
+                                          Expanded(
+                                            child: Text(
+                                              _suggestedActionItems[index],
+                                              style: GoogleFonts.dmSans(
+                                                fontSize: 15,
+                                                fontWeight: _selectedItems[index] ? FontWeight.w600 : FontWeight.w500,
+                                                color: Colors.black,
+                                                letterSpacing: -0.2,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 20,
-                                          height: 20,
-                                          decoration: BoxDecoration(
-                                            color: _selectedItems[index] ? Colors.black : Colors.transparent,
-                                            borderRadius: BorderRadius.circular(4),
-                                            border: Border.all(
-                                              color: _selectedItems[index] ? Colors.black : Colors.grey[400]!,
-                                              width: 2,
-                                            ),
-                                          ),
-                                          child: _selectedItems[index]
-                                              ? const Icon(
-                                                  Icons.check,
-                                                  color: Colors.white,
-                                                  size: 14,
-                                                )
-                                              : null,
-                                        ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Text(
-                                            _suggestedActionItems[index],
-                                            style: GoogleFonts.dmSans(
-                                              fontSize: 15,
-                                              fontWeight: _selectedItems[index] ? FontWeight.w600 : FontWeight.w500,
-                                              color: Colors.black,
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
                                   ),
-                                ),
-                              );
-                            },
+                                );
+                              }),
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      if (_selectedItems.any((selected) => selected)) ...[
-                        GestureDetector(
-                          onTap: _createSelectedTasks,
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.black,
-                              borderRadius: BorderRadius.circular(25),
+                    ],
+                    
+                    // Both buttons grouped at bottom
+                    if (_currentStep == 1 && _showSuggestions && _showOptions) ...[
+                      // Add Selected Tasks button - always visible but disabled when nothing selected
+                      GestureDetector(
+                        onTap: _selectedItems.any((selected) => selected) ? _createSelectedTasks : null,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: _selectedItems.any((selected) => selected) ? Colors.black : Colors.grey[300],
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: Text(
+                            'Add Selected Tasks',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: _selectedItems.any((selected) => selected) ? Colors.white : Colors.grey[600],
+                              letterSpacing: -0.2,
                             ),
-                            child: Text(
-                              'Add Selected Tasks',
-                              style: GoogleFonts.dmSans(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                                letterSpacing: -0.2,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
+                            textAlign: TextAlign.center,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                      ],
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      // Maybe later button
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: Container(
@@ -398,8 +398,6 @@ class _BenMeetingSuggestionScreenState extends State<BenMeetingSuggestionScreen>
                         ),
                       ),
                     ],
-                    
-                    const Spacer(flex: 1),
                   ],
                 ),
               ),
