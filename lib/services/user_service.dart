@@ -4,7 +4,7 @@ class UserService {
   UserService._internal();
 
   // User type based on email - in real app this would come from auth/user service
-  String _userEmail = 'newuser@sentienwork.com'; // Change to 'newuser@sentienwork.com' for limited access or 'poweruser@sentienwork.com' for full access
+  String _userEmail = 'poweruser@sentienwork.com'; // Change to 'newuser@sentienwork.com' for limited access or 'poweruser@sentienwork.com' for full access
   
   String get userEmail => _userEmail;
   bool get isNewUser => _userEmail == 'newuser@sentienwork.com';
