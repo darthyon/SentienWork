@@ -1,0 +1,1 @@
+ /Users/yonyusuff/CascadeProjects/SentienWork/build/web/favicon.png /Users/yonyusuff/CascadeProjects/SentienWork/build/web/manifest.json:  /Users/yonyusuff/CascadeProjects/SentienWork/web/index.html /Users/yonyusuff/CascadeProjects/SentienWork/web/favicon.png /Users/yonyusuff/CascadeProjects/SentienWork/web/manifest.json
